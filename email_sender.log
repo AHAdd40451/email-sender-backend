@@ -36,3 +36,15 @@
 2024-11-20 22:10:55,961 - DEBUG - Validating WebSocket request
 2024-11-20 22:10:55,961 - DEBUG - Attempting to upgrade connection
 2024-11-20 22:10:55,962 - DEBUG - WebSocket request accepted, switching protocols
+2024-11-20 22:19:54,563 - DEBUG - Initializing WebSocket
+2024-11-20 22:19:54,563 - DEBUG - Validating WebSocket request
+2024-11-20 22:19:54,578 - INFO - 127.0.0.1 - - [2024-11-20 22:19:54] "GET /get-logs HTTP/1.1" 200 4259 0.014566
+2024-11-20 22:19:54,899 - DEBUG - Initializing WebSocket
+2024-11-20 22:19:54,899 - DEBUG - Validating WebSocket request
+2024-11-20 22:19:54,899 - DEBUG - Attempting to upgrade connection
+2024-11-20 22:19:54,899 - DEBUG - WebSocket request accepted, switching protocols
+2024-11-20 22:19:56,526 - DEBUG - Closed WebSocket
+2024-11-20 22:19:56,531 - DEBUG - Failed to write closing frame -> closing socket
+2024-11-20 22:19:56,531 - DEBUG - Closed WebSocket
+2024-11-20 22:19:56,531 - DEBUG - Failed to write closing frame -> closing socket
+2024-11-20 22:19:56,531 - DEBUG - Closed WebSocket
