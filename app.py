@@ -6,7 +6,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 # Pass socketio instance to bulk_email module
 bulk_email.socketio = socketio
