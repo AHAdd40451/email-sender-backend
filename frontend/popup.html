@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bulk Email Sender</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="settings">Settings</button>
+            <button class="tab-btn" data-tab="emails">Email List</button>
+            <button class="tab-btn" data-tab="template">Template</button>
+        </div>
+
+        <div id="settings" class="tab-content active">
+            <h3>SMTP Settings</h3>
+            <div class="form-group">
+                <input type="text" id="sender-name" placeholder="Sender Name">
+                <input type="text" id="smtp-server" placeholder="SMTP Server" value="smtpout.secureserver.net">
+                <input type="number" id="smtp-port" placeholder="SMTP Port" value="587">
+                <input type="email" id="username" placeholder="Email Username">
+                <input type="password" id="password" placeholder="Email Password">
+                <input type="number" id="delay" placeholder="Delay (seconds)" value="5">
+            </div>
+        </div>
+
+        <div id="emails" class="tab-content">
+            <h3>Email List</h3>
+            <div class="email-tools">
+                <button id="add-email">Add Email</button>
+                <button id="import-csv">Import CSV</button>
+                <button id="export-csv">Export CSV</button>
+            </div>
+            <div class="email-list" id="email-list">
+                <!-- Emails will be added here dynamically -->
+            </div>
+        </div>
+
+        <div id="template" class="tab-content">
+            <h3>Email Template</h3>
+            <div class="template-form">
+                <input type="text" id="email-subject" placeholder="Email Subject" class="full-width">
+                <textarea 
+                    id="email-body" 
+                    placeholder="Enter your email content here... (HTML or plain text)"
+                    class="full-width template-textarea"
+                ></textarea>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button id="save-settings" class="primary-btn">Save Settings</button>
+            <button id="send-emails" class="primary-btn">Send Emails</button>
+        </div>
+
+        <div id="status" class="status"></div>
+        <div id="progress" class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+        <div id="clear-logs" style="padding-top: 10px; cursor: pointer;">Clear Logs</div>
+
+        <div class="logs-container">
+            <h3>Logs</h3>
+            <div id="log-entries" class="log-entries"></div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+    <script src="socket.io.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Bulk Email Sender",
+  "version": "1.0",
+  "description": "Send bulk emails with verification",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "unlimitedStorage",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "https://email-sender-backend-dyxz.onrender.com/*"
+  ],
+
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
