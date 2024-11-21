@@ -10,6 +10,8 @@ import re
 from dns import resolver
 from datetime import datetime, timedelta
 from flask_socketio import SocketIO
+from email.mime.application import MIMEApplication
+import base64
 
 # Set up logging
 logging.basicConfig(
@@ -35,9 +37,9 @@ CACHE_DURATION = timedelta(hours=24)
 
 socketio = None  # Will be set by app.py
 
-def create_email(subject, recipient_email, html_content):
-    """Create a multipart email"""
-    msg = MIMEMultipart('alternative')
+def create_email(subject, recipient_email, html_content, attachments=None):
+    """Create a multipart email with optional attachments"""
+    msg = MIMEMultipart('mixed')
     msg['From'] = formataddr((SENDER_NAME, USERNAME))
     msg['To'] = recipient_email
     msg['Subject'] = subject
@@ -45,8 +47,28 @@ def create_email(subject, recipient_email, html_content):
     msg['Date'] = email.utils.formatdate(localtime=True)
     msg['Reply-To'] = USERNAME
     
-    # Attach the HTML content directly
-    msg.attach(MIMEText(html_content, 'html'))
+    # Create the HTML part
+    html_part = MIMEMultipart('alternative')
+    html_part.attach(MIMEText(html_content, 'html'))
+    msg.attach(html_part)
+    
+    # Add attachments if any
+    if attachments:
+        for attachment in attachments:
+            try:
+                part = MIMEApplication(
+                    base64.b64decode(attachment['content']),
+                    _subtype=attachment['contentType'].split('/')[-1]
+                )
+                part.add_header(
+                    'Content-Disposition',
+                    'attachment',
+                    filename=attachment['filename']
+                )
+                msg.attach(part)
+                emit_log(f"Attached file: {attachment['filename']}", 'info')
+            except Exception as e:
+                emit_log(f"Failed to attach file {attachment['filename']}: {str(e)}", 'error')
     
     return msg
 
@@ -84,7 +106,7 @@ def verify_email(email):
         emit_log(f"Error verifying email {email}: {str(e)}", 'error')
         return False
 
-def send_bulk_emails(email_list, subject, body_text, delay=None):
+def send_bulk_emails(email_list, subject, body_text, attachments=None, delay=None):
     if delay is None:
         delay = DELAY
         
@@ -97,7 +119,7 @@ def send_bulk_emails(email_list, subject, body_text, delay=None):
         try:
             if verify_email(recipient_email):
                 with connect_smtp() as smtp:
-                    msg = create_email(subject, recipient_email, body_text)
+                    msg = create_email(subject, recipient_email, body_text, attachments)
                     smtp.send_message(msg)
                     success_count += 1
                     emit_log(f"[{success_count}/{total_emails}] Successfully sent email to {recipient_email}", 'success')

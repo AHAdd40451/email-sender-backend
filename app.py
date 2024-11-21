@@ -36,10 +36,18 @@ def send_emails():
         bulk_email.PASSWORD = data['password']
         bulk_email.DELAY = int(data['delay'])
         bulk_email.SENDER_NAME = data['senderName']
-        # Process emails
+        
+        # Process emails with attachments
         body_text = data['emailTemplate']
         subject = data['emailSubject']
-        bulk_email.send_bulk_emails(data['emailList'], subject, body_text)
+        attachments = data.get('attachments', None)
+        
+        bulk_email.send_bulk_emails(
+            data['emailList'], 
+            subject, 
+            body_text, 
+            attachments=attachments
+        )
 
         emit_log(f'Successfully processed {len(data["emailList"])} emails', 'success')
         return jsonify({

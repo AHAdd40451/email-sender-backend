@@ -124,12 +124,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         addLogEntry('Starting new email process...', 'info');
         
+        const files = document.getElementById('email-attachment').files;
+        const attachments = [];
+        
+        for (let file of files) {
+            const base64Data = await getBase64(file);
+            attachments.push({
+                filename: file.name,
+                content: base64Data,
+                contentType: file.type
+            });
+        }
+
         const settings = await chrome.storage.local.get('emailState');
         const config = {
             ...settings.emailState?.inputValues,
             emailList: Array.from(emailList),
             emailSubject: document.getElementById('email-subject').value,
-            emailTemplate: document.getElementById('email-body').value
+            emailTemplate: document.getElementById('email-body').value,
+            attachments: attachments
         };
 
         showStatus('Starting email process...');
@@ -291,7 +304,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 senderName: document.getElementById('sender-name').value,
                 delay: document.getElementById('delay').value,
                 emailSubject: document.getElementById('email-subject').value,
-                emailTemplate: document.getElementById('email-body').value
+                emailTemplate: document.getElementById('email-body').value,
+                attachments: Array.from(document.getElementById('email-attachment').files)
             };
             chrome.storage.local.set({ emailState: currentState });
         });
@@ -318,3 +332,13 @@ document.addEventListener('DOMContentLoaded', function() {
     loadEmailList();
     initializeSocketAndLogs();
 });
+
+// Add this new function to handle file attachments
+async function getBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = error => reject(error);
+    });
+}
