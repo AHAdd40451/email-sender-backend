@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import logging
 from dotenv import load_dotenv
 import os
+import json
 
 # Load environment variables
 load_dotenv()
@@ -189,29 +190,67 @@ class User:
     def id(self):
         return str(self._id) if self._id else None
 
+class JSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
 class Log:
     collection = db['logs']
 
     @classmethod
-    def add(cls, user_id, message, level='info'):
-        log_data = {
-            'user_id': user_id,
-            'message': message,
-            'level': level,
-            'timestamp': datetime.utcnow()
-        }
-        cls.collection.insert_one(log_data)
+    def add(cls, user_id, message, level='info', details=None):
+        try:
+            log_data = {
+                'user_id': ObjectId(user_id) if isinstance(user_id, str) else user_id,
+                'message': message,
+                'level': level,
+                'timestamp': datetime.utcnow(),
+                'details': details
+            }
+            result = cls.collection.insert_one(log_data)
+            logger.info(f"Log entry saved with ID: {result.inserted_id}")
+            return log_data
+        except Exception as e:
+            logger.error(f"Error saving log: {e}")
+            raise
 
     @classmethod
     def get_by_user(cls, user_id, limit=100):
-        return list(cls.collection.find(
-            {'user_id': user_id},
-            {'_id': 0}
-        ).sort('timestamp', -1).limit(limit))
+        try:
+            user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
+            cursor = cls.collection.find(
+                {'user_id': user_id_obj}
+            ).sort('timestamp', -1).limit(limit)
+            
+            logs = []
+            for log in cursor:
+                # Convert ObjectId to string
+                log['_id'] = str(log['_id'])
+                log['user_id'] = str(log['user_id'])
+                # Convert datetime to ISO format string
+                log['timestamp'] = log['timestamp'].isoformat()
+                logs.append(log)
+            
+            logger.info(f"Retrieved {len(logs)} logs for user {user_id}")
+            return logs
+        except Exception as e:
+            logger.error(f"Error retrieving logs: {e}")
+            raise
 
     @classmethod
     def clear_user_logs(cls, user_id):
-        cls.collection.delete_many({'user_id': user_id})
+        try:
+            user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
+            result = cls.collection.delete_many({'user_id': user_id_obj})
+            logger.info(f"Cleared {result.deleted_count} logs for user {user_id}")
+            return result.deleted_count
+        except Exception as e:
+            logger.error(f"Error clearing logs: {e}")
+            raise
 
 class EmailTemplate:
     collection = db['email_templates']

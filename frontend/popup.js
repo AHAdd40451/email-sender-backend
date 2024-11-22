@@ -20,6 +20,8 @@ async function initializeApp() {
         // Load initial data
         await loadSmtpSettings();
         
+        await loadLogs();
+        
         console.log('App initialized successfully');
         addLogEntry('Application initialized successfully', 'success');
     } catch (error) {
@@ -75,6 +77,12 @@ function setupEventListeners() {
             localStorage.removeItem('token');
             window.location.href = 'login.html';
         });
+    }
+
+    // Clear Logs Button
+    const clearLogsBtn = document.getElementById('clear-logs-btn');
+    if (clearLogsBtn) {
+        clearLogsBtn.addEventListener('click', clearLogs);
     }
 }
 
@@ -318,4 +326,101 @@ function addLogEntry(message, type = 'info') {
     entry.textContent = `[${timestamp}] ${message}`;
     logEntries.appendChild(entry);
     logEntries.scrollTop = logEntries.scrollHeight;
+}
+
+async function loadLogs() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            throw new Error('No authentication token found');
+        }
+
+        const response = await fetch(`${API_BASE_URL}/logs`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.status === 401) {
+            localStorage.removeItem('token');
+            window.location.href = 'login.html';
+            return;
+        }
+
+        const data = await response.json();
+        
+        if (data.status === 'error') {
+            throw new Error(data.message);
+        }
+
+        const logEntries = document.getElementById('log-entries');
+        logEntries.innerHTML = '';
+
+        if (data.logs && Array.isArray(data.logs)) {
+            // Sort logs by timestamp in descending order
+            const sortedLogs = data.logs.sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+
+            sortedLogs.forEach(log => {
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${log.level}`;
+                
+                // Format timestamp
+                const timestamp = new Date(log.timestamp).toLocaleString();
+                
+                // Create log message with proper formatting
+                entry.innerHTML = `
+                    <span class="log-timestamp">[${timestamp}]</span>
+                    <span class="log-level ${log.level}">${log.level.toUpperCase()}</span>
+                    <span class="log-message">${log.message}</span>
+                `;
+                
+                // Add details if they exist
+                if (log.details) {
+                    const detailsSpan = document.createElement('span');
+                    detailsSpan.className = 'log-details';
+                    detailsSpan.textContent = JSON.stringify(log.details);
+                    entry.appendChild(detailsSpan);
+                }
+                
+                logEntries.appendChild(entry);
+            });
+
+            // Add log count
+            const logCount = document.createElement('div');
+            logCount.className = 'log-count';
+            logCount.textContent = `Showing ${sortedLogs.length} logs`;
+            logEntries.insertBefore(logCount, logEntries.firstChild);
+        }
+
+    } catch (error) {
+        console.error('Error loading logs:', error);
+        addLogEntry(`Failed to load logs: ${error.message}`, 'error');
+    }
+}
+
+async function clearLogs() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/logs/clear`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to clear logs');
+        }
+
+        const data = await response.json();
+        addLogEntry(data.message, 'success');
+        await loadLogs(); // Reload logs after clearing
+
+    } catch (error) {
+        console.error('Error clearing logs:', error);
+        addLogEntry('Failed to clear logs', 'error');
+    }
 }

@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
-from models import User, SmtpSettings, Log
+from models import User, SmtpSettings, Log, JSONEncoder
 import logging
 import os
 import smtplib
@@ -9,6 +9,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from bson import ObjectId
 from email_utils import EmailSender
+from datetime import datetime
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+app.json_encoder = JSONEncoder  # Use custom JSON encoder
 
 # Setup CORS
 CORS(app, resources={
@@ -154,8 +156,8 @@ def send_emails():
                 'message': 'Please configure SMTP settings first'
             }), 400
 
-        # Initialize email sender
-        email_sender = EmailSender(smtp_settings)
+        # Initialize email sender with user_id
+        email_sender = EmailSender(smtp_settings, user_id)
         
         # Send emails
         result = email_sender.send_bulk_emails(
@@ -181,6 +183,48 @@ def send_emails():
         return jsonify({
             'status': 'error',
             'message': f'Failed to send emails: {str(e)}'
+        }), 500
+
+@app.route('/logs', methods=['GET'])
+@jwt_required()
+def get_logs():
+    try:
+        user_id = get_jwt_identity()
+        limit = request.args.get('limit', 100, type=int)
+        
+        logger.info(f"Fetching logs for user {user_id}")
+        logs = Log.get_by_user(user_id, limit)
+        
+        return jsonify({
+            'status': 'success',
+            'logs': logs
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching logs: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/logs/clear', methods=['POST'])
+@jwt_required()
+def clear_logs():
+    try:
+        user_id = get_jwt_identity()
+        deleted_count = Log.clear_user_logs(user_id)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Cleared {deleted_count} log entries',
+            'deleted_count': deleted_count
+        })
+
+    except Exception as e:
+        logger.error(f"Error clearing logs: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
         }), 500
 
 # Add error handlers

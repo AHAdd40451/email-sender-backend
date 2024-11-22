@@ -30,3 +30,43 @@
 2024-11-22 15:30:02,274 - DEBUG - {"topologyId": {"$oid": "67405c92077743a1a2f22ac5"}, "serverHost": "localhost", "serverPort": 27017, "awaited": false, "durationMS": 2015.9999999887077, "failure": "\"AutoReconnect('localhost:27017: [WinError 10061] No connection could be made because the target machine actively refused it (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')\"", "message": "Server heartbeat failed"}
 2024-11-22 15:30:02,274 - DEBUG - {"topologyId": {"$oid": "67405c92077743a1a2f22ac5"}, "previousDescription": "<TopologyDescription id: 67405c92077743a1a2f22ac5, topology_type: Unknown, servers: [<ServerDescription ('localhost', 27017) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:27017: [WinError 10061] No connection could be made because the target machine actively refused it (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>", "newDescription": "<TopologyDescription id: 67405c92077743a1a2f22ac5, topology_type: Unknown, servers: [<ServerDescription ('localhost', 27017) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:27017: [WinError 10061] No connection could be made because the target machine actively refused it (configured timeouts: socketTimeoutMS: 20000.0ms, connectTimeoutMS: 20000.0ms)')>]>", "message": "Topology description changed"}
 2024-11-22 15:30:02,803 - INFO - 127.0.0.1 - - [2024-11-22 15:30:02] "POST /smtp-settings HTTP/1.1" 500 140 58.831524
+2024-11-22 16:02:02,124 - INFO - Starting to send emails to 1 recipients
+2024-11-22 16:02:02,254 - INFO - Using delay of 5 seconds between emails
+2024-11-22 16:02:02,364 - INFO - Verifying email domain: gmail.com
+2024-11-22 16:02:02,492 - INFO - MX records found for domain gmail.com
+2024-11-22 16:02:08,336 - SUCCESS - [1/1] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 16:02:08,573 - INFO - Email sending completed. Success: 1, Failed: 0
+2024-11-22 16:02:24,030 - INFO - Starting to send emails to 2 recipients
+2024-11-22 16:02:24,945 - INFO - Using delay of 5 seconds between emails
+2024-11-22 16:02:26,361 - INFO - Verifying email domain: gmail.com
+2024-11-22 16:02:26,932 - INFO - MX records found for domain gmail.com
+2024-11-22 16:02:32,400 - SUCCESS - [1/2] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 16:02:32,498 - INFO - Waiting 6.3 seconds before sending to ahadd40451@gmail.com
+2024-11-22 16:02:39,046 - INFO - Verifying email domain: gmail.com
+2024-11-22 16:02:39,156 - INFO - MX records found for domain gmail.com
+2024-11-22 16:02:44,755 - SUCCESS - [2/2] Successfully sent email to ahadd40451@gmail.com
+2024-11-22 16:02:44,979 - INFO - Email sending completed. Success: 2, Failed: 0
+2024-11-22 16:05:03,669 - INFO - Starting to send emails to 1 recipients
+2024-11-22 16:05:03,786 - INFO - Using delay of 5 seconds between emails
+2024-11-22 16:05:03,890 - INFO - Verifying email domain: gmail.com
+2024-11-22 16:05:04,014 - INFO - MX records found for domain gmail.com
+2024-11-22 16:05:09,664 - SUCCESS - [1/1] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 16:05:09,901 - INFO - Email sending completed. Success: 1, Failed: 0
+2024-11-22 16:07:08,182 - INFO - Starting to send emails to 1 recipients
+2024-11-22 16:07:08,303 - INFO - Using delay of 5 seconds between emails
+2024-11-22 16:07:08,405 - INFO - Verifying email domain: gmail.com
+2024-11-22 16:07:08,525 - INFO - MX records found for domain gmail.com
+2024-11-22 16:07:14,064 - SUCCESS - [1/1] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 16:07:14,296 - INFO - Email sending completed. Success: 1, Failed: 0
+2024-11-22 16:07:57,686 - INFO - Starting to send emails to 1 recipients
+2024-11-22 16:07:57,826 - INFO - Using delay of 5 seconds between emails
+2024-11-22 16:07:57,944 - INFO - Verifying email domain: gmail.com
+2024-11-22 16:07:58,067 - INFO - MX records found for domain gmail.com
+2024-11-22 16:08:11,370 - SUCCESS - [1/1] Successfully sent email to ahadd40451@gmail.com
+2024-11-22 16:08:11,836 - INFO - Email sending completed. Success: 1, Failed: 0
+2024-11-22 16:11:03,005 - INFO - Starting to send emails to 1 recipients
+2024-11-22 16:11:03,124 - INFO - Using delay of 5 seconds between emails
+2024-11-22 16:11:03,228 - INFO - Verifying email domain: gmail.com
+2024-11-22 16:11:03,348 - INFO - MX records found for domain gmail.com
+2024-11-22 16:11:09,378 - SUCCESS - [1/1] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 16:11:09,758 - INFO - Email sending completed. Success: 1, Failed: 0
