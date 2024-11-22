@@ -22,6 +22,8 @@ async function initializeApp() {
         
         await loadLogs();
         
+        await loadSavedData();
+        
         console.log('App initialized successfully');
         addLogEntry('Application initialized successfully', 'success');
     } catch (error) {
@@ -83,6 +85,47 @@ function setupEventListeners() {
     const clearLogsBtn = document.getElementById('clear-logs-btn');
     if (clearLogsBtn) {
         clearLogsBtn.addEventListener('click', clearLogs);
+    }
+
+    // Auto-save email template
+    const emailSubject = document.getElementById('email-subject');
+    const emailBody = document.getElementById('email-body');
+    
+    if (emailSubject) {
+        emailSubject.addEventListener('input', debounce(saveEmailTemplate, 1000));
+    }
+    
+    if (emailBody) {
+        emailBody.addEventListener('input', debounce(saveEmailTemplate, 1000));
+    }
+    
+    // Auto-save email list
+    const emailList = document.getElementById('email-list');
+    if (emailList) {
+        emailList.addEventListener('input', debounce(saveEmailList, 1000));
+    }
+
+    // CSV Import
+    const importCsvBtn = document.getElementById('import-csv-btn');
+    const csvFileInput = document.getElementById('csv-file');
+
+    if (importCsvBtn && csvFileInput) {
+        importCsvBtn.addEventListener('click', () => {
+            csvFileInput.click();
+        });
+
+        csvFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    handleCsvImport(file);
+                } else {
+                    addLogEntry('Please select a valid CSV file', 'error');
+                }
+                // Reset file input
+                csvFileInput.value = '';
+            }
+        });
     }
 }
 
@@ -422,5 +465,131 @@ async function clearLogs() {
     } catch (error) {
         console.error('Error clearing logs:', error);
         addLogEntry('Failed to clear logs', 'error');
+    }
+}
+
+async function loadSavedData() {
+    try {
+        const result = await chrome.storage.local.get(['emailTemplate', 'emailList']);
+        
+        // Load email template
+        if (result.emailTemplate) {
+            document.getElementById('email-subject').value = result.emailTemplate.subject || '';
+            document.getElementById('email-body').value = result.emailTemplate.body || '';
+        }
+        
+        // Load email list
+        if (result.emailList) {
+            document.getElementById('email-list').value = result.emailList.join('\n');
+        }
+        
+    } catch (error) {
+        console.error('Error loading saved data:', error);
+        addLogEntry('Failed to load saved data', 'error');
+    }
+}
+
+// Function to save template
+async function saveEmailTemplate() {
+    try {
+        const subject = document.getElementById('email-subject').value;
+        const body = document.getElementById('email-body').value;
+        
+        await chrome.storage.local.set({
+            emailTemplate: {
+                subject: subject,
+                body: body
+            }
+        });
+        
+        addLogEntry('Email template saved', 'success');
+    } catch (error) {
+        console.error('Error saving template:', error);
+        addLogEntry('Failed to save template', 'error');
+    }
+}
+
+// Function to save email list
+async function saveEmailList() {
+    try {
+        const emailListText = document.getElementById('email-list').value;
+        const emailList = emailListText.split('\n').filter(email => email.trim());
+        
+        await chrome.storage.local.set({
+            emailList: emailList
+        });
+        
+        addLogEntry('Email list saved', 'success');
+    } catch (error) {
+        console.error('Error saving email list:', error);
+        addLogEntry('Failed to save email list', 'error');
+    }
+}
+
+// Add debounce utility function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Add this function after the addEmail function
+async function handleCsvImport(file) {
+    try {
+        const reader = new FileReader();
+        
+        reader.onload = async (event) => {
+            const csvContent = event.target.result;
+            const lines = csvContent.split(/\r\n|\n/);
+            const emailList = document.getElementById('email-list');
+            const currentEmails = new Set(emailList.value.split('\n').filter(e => e.trim()));
+            let importCount = 0;
+            let invalidCount = 0;
+            let duplicateCount = 0;
+
+            for (let line of lines) {
+                const email = line.trim();
+                if (email && isValidEmail(email)) {
+                    if (!currentEmails.has(email)) {
+                        currentEmails.add(email);
+                        importCount++;
+                    } else {
+                        duplicateCount++;
+                    }
+                } else if (email) {
+                    invalidCount++;
+                }
+            }
+
+            emailList.value = Array.from(currentEmails).join('\n');
+            
+            // Save the updated email list
+            await saveEmailList();
+
+            // Show import results
+            addLogEntry(`CSV Import Results:`, 'info');
+            addLogEntry(`- ${importCount} emails imported successfully`, 'success');
+            if (duplicateCount > 0) {
+                addLogEntry(`- ${duplicateCount} duplicate emails skipped`, 'warning');
+            }
+            if (invalidCount > 0) {
+                addLogEntry(`- ${invalidCount} invalid emails skipped`, 'error');
+            }
+        };
+
+        reader.onerror = () => {
+            throw new Error('Error reading CSV file');
+        };
+
+        reader.readAsText(file);
+    } catch (error) {
+        console.error('Error importing CSV:', error);
+        addLogEntry(`Failed to import CSV: ${error.message}`, 'error');
     }
 }
