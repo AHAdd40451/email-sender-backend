@@ -7,6 +7,8 @@ import logging
 from dotenv import load_dotenv
 import os
 import json
+from bson.binary import Binary
+import base64
 
 # Load environment variables
 load_dotenv()
@@ -55,6 +57,29 @@ def setup_collections():
                         'sender_name': {'bsonType': 'string'},
                         'delay': {'bsonType': 'int'},
                         'updated_at': {'bsonType': 'date'}
+                    }
+                }
+            }
+        })
+        logger.info("Collections setup completed")
+    except Exception as e:
+        if 'already exists' not in str(e):
+            logger.error(f"Error setting up collections: {e}")
+            raise
+
+    try:
+        # Create users collection with updated schema validation
+        db.create_collection('users')
+        db.command({
+            'collMod': 'users',
+            'validator': {
+                '$jsonSchema': {
+                    'bsonType': 'object',
+                    'required': ['email', 'password', 'created_at'],
+                    'properties': {
+                        'email': {'bsonType': 'string'},
+                        'password': {'bsonType': 'string'},
+                        'created_at': {'bsonType': 'date'}
                     }
                 }
             }
@@ -153,42 +178,50 @@ class SmtpSettings:
 class User:
     collection = db['users']
 
-    def __init__(self, email, password_hash, _id=None):
+    def __init__(self, _id, email, password):
+        self._id = _id
         self.email = email
-        self.password_hash = password_hash
-        self._id = ObjectId(_id) if _id else None
+        self.password = password
 
-    @classmethod
-    def create(cls, email, password):
-        if cls.collection.find_one({'email': email}):
-            raise ValueError('Email already exists')
-        
-        password_hash = generate_password_hash(password)
-        user_data = {
-            'email': email,
-            'password_hash': password_hash,
-            'created_at': datetime.utcnow()
-        }
-        result = cls.collection.insert_one(user_data)
-        return cls(email=email, password_hash=password_hash, _id=result.inserted_id)
+    @staticmethod
+    def create_user(email, password):
+        if db.users.find_one({'email': email}):
+            raise ValueError('Email already registered')
 
-    @classmethod
-    def get_by_email(cls, email):
-        user_data = cls.collection.find_one({'email': email})
+        try:
+            # Store password as plain text
+            result = db.users.insert_one({
+                'email': email,
+                'password': password,  # Plain text password
+                'created_at': datetime.utcnow()
+            })
+            
+            return User(result.inserted_id, email, password)
+            
+        except Exception as e:
+            logger.error(f"Error creating user: {str(e)}")
+            raise ValueError(str(e))
+
+    @staticmethod
+    def get_by_email(email):
+        user_data = db.users.find_one({'email': email})
         if user_data:
-            return cls(
-                email=user_data['email'],
-                password_hash=user_data['password_hash'],
-                _id=user_data['_id']
+            return User(
+                user_data['_id'],
+                user_data['email'],
+                user_data['password']  # Plain text password
             )
         return None
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        # Simple plain text comparison
+        return self.password == password
 
-    @property
-    def id(self):
-        return str(self._id) if self._id else None
+    def to_dict(self):
+        return {
+            'id': str(self._id),
+            'email': self.email
+        }
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, obj):

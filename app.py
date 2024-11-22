@@ -113,24 +113,77 @@ def login():
             }), 400
 
         user = User.get_by_email(email)
-        if user and user.check_password(password):
-            # Create token with string ID
-            access_token = create_access_token(identity=str(user._id))
+        if not user:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid email or password'
+            }), 401
+
+        # Add debug logging
+        print(f"Stored password: {user.password}")
+        print(f"Provided password: {password}")
+        
+        if user.check_password(password):
+            token = create_access_token(identity=str(user._id))
             return jsonify({
                 'status': 'success',
-                'token': access_token
+                'token': token,
+                'user': user.to_dict()
             })
-        
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid email or password'
+            }), 401
+
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'An error occurred during login'
+        }), 500
+    try:
+        data = request.json
+        email = data.get('email')
+        password = data.get('password')
+
+        if not email or not password:
+            return jsonify({
+                'status': 'error',
+                'message': 'Email and password are required'
+            }), 400
+
+        user = User.get_by_email(email)
+        if not user:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid email or password'
+            }), 401
+
+        # Convert password to bytes before checking
+        try:
+            if isinstance(password, str):
+                password = password.encode('utf-8')
+            
+            if user.check_password(password):
+                access_token = create_access_token(identity=str(user._id))
+                return jsonify({
+                    'status': 'success',
+                    'token': access_token
+                })
+        except Exception as e:
+            logger.error(f"Password verification error: {str(e)}")
+            
         return jsonify({
             'status': 'error',
             'message': 'Invalid email or password'
         }), 401
 
     except Exception as e:
-        logger.error(f"Login error: {e}")
+        logger.error(f"Login error: {str(e)}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': 'An error occurred during login'
         }), 500
 
 @app.route('/send-emails', methods=['POST'])
@@ -225,6 +278,38 @@ def clear_logs():
         return jsonify({
             'status': 'error',
             'message': str(e)
+        }), 500
+
+@app.route('/register', methods=['POST'])
+def register():
+    try:
+        data = request.json
+        email = data.get('email')
+        password = data.get('password')
+
+        if not email or not password:
+            return jsonify({
+                'status': 'error',
+                'message': 'Email and password are required'
+            }), 400
+
+        user = User.create_user(email=email, password=password)
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Registration successful'
+        })
+
+    except ValueError as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'An error occurred during registration'
         }), 500
 
 # Add error handlers

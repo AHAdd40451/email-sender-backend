@@ -70,3 +70,9 @@
 2024-11-22 16:11:03,348 - INFO - MX records found for domain gmail.com
 2024-11-22 16:11:09,378 - SUCCESS - [1/1] Successfully sent email to ahadkhan40451@gmail.com
 2024-11-22 16:11:09,758 - INFO - Email sending completed. Success: 1, Failed: 0
+2024-11-22 17:18:08,028 - INFO - Starting to send emails to 1 recipients
+2024-11-22 17:18:08,139 - INFO - Using delay of 5 seconds between emails
+2024-11-22 17:18:08,265 - INFO - Verifying email domain: gmail.com
+2024-11-22 17:18:08,405 - INFO - MX records found for domain gmail.com
+2024-11-22 17:18:13,935 - SUCCESS - [1/1] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 17:18:14,172 - INFO - Email sending completed. Success: 1, Failed: 0

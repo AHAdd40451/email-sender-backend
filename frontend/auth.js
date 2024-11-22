@@ -37,15 +37,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const data = await response.json();
-            if (response.ok) {
-                localStorage.setItem('token', data.access_token);
-                localStorage.setItem('userEmail', data.user_email);
+            
+            if (response.ok && data.status === 'success') {
+                localStorage.setItem('token', data.token);
                 window.location.href = 'popup.html';
             } else {
-                alert(data.error || 'Login failed');
+                alert(data.message || 'Login failed');
             }
         } catch (error) {
-            alert('Login failed: ' + error.message);
+            console.error('Login error:', error);
+            alert('Login failed: Network or server error');
         }
     });
 
@@ -69,15 +70,18 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const data = await response.json();
-            if (response.ok) {
+            console.log('Registration response:', data);
+
+            if (response.ok && data.status === 'success') {
                 alert('Registration successful! Please login.');
                 registerForm.classList.add('hidden');
                 loginForm.classList.remove('hidden');
             } else {
-                alert(data.error || 'Registration failed');
+                alert(data.message || 'Registration failed');
             }
         } catch (error) {
-            alert('Registration failed: ' + error.message);
+            console.error('Registration error:', error);
+            alert('Registration failed: Network or server error');
         }
     });
 });
