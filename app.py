@@ -8,6 +8,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from bson import ObjectId
+from email_utils import EmailSender
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -140,7 +141,6 @@ def send_emails():
         
         # Validate input
         if not data.get('emails') or not data.get('subject') or not data.get('body'):
-            logger.error("Missing required fields in email request")
             return jsonify({
                 'status': 'error',
                 'message': 'Emails, subject, and body are required'
@@ -149,67 +149,30 @@ def send_emails():
         # Get SMTP settings
         smtp_settings = SmtpSettings.get_by_user_id(user_id)
         if not smtp_settings:
-            logger.error(f"No SMTP settings found for user {user_id}")
             return jsonify({
                 'status': 'error',
                 'message': 'Please configure SMTP settings first'
             }), 400
 
-        successful_sends = 0
-        failed_sends = 0
-        errors = []
+        # Initialize email sender
+        email_sender = EmailSender(smtp_settings)
         
-        logger.info(f"Attempting to send emails to {len(data['emails'])} recipients")
+        # Send emails
+        result = email_sender.send_bulk_emails(
+            email_list=data['emails'],
+            subject=data['subject'],
+            body_text=data['body'],
+            attachments=data.get('attachments')
+        )
 
-        try:
-            # Connect to SMTP server
-            server = smtplib.SMTP(smtp_settings.smtp_server, smtp_settings.smtp_port)
-            server.starttls()
-            server.login(smtp_settings.username, smtp_settings.password)
-            
-            for recipient in data['emails']:
-                try:
-                    # Create message
-                    msg = MIMEMultipart()
-                    msg['From'] = f"{smtp_settings.sender_name} <{smtp_settings.username}>" if smtp_settings.sender_name else smtp_settings.username
-                    msg['To'] = recipient
-                    msg['Subject'] = data['subject']
-                    
-                    # Add body
-                    msg.attach(MIMEText(data['body'], 'html'))
-                    
-                    # Send email
-                    server.send_message(msg)
-                    successful_sends += 1
-                    logger.info(f"Successfully sent email to {recipient}")
-                    
-                except Exception as e:
-                    failed_sends += 1
-                    error_msg = f"Failed to send to {recipient}: {str(e)}"
-                    errors.append(error_msg)
-                    logger.error(error_msg)
-
-            server.quit()
-
-        except Exception as smtp_error:
-            logger.error(f"SMTP connection error: {smtp_error}")
-            return jsonify({
-                'status': 'error',
-                'message': f'SMTP connection failed: {str(smtp_error)}'
-            }), 500
-
-        result_message = f'Sent {successful_sends} emails successfully'
-        if failed_sends > 0:
-            result_message += f', {failed_sends} failed'
-
-        logger.info(result_message)
         return jsonify({
             'status': 'success',
-            'message': result_message,
+            'message': result['summary'],
             'details': {
-                'successful': successful_sends,
-                'failed': failed_sends,
-                'errors': errors
+                'successful': result['success_count'],
+                'failed': result['failed_count'],
+                'total': result['total'],
+                'results': result['results']
             }
         })
 
