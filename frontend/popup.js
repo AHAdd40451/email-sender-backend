@@ -169,6 +169,17 @@ function setupEventListeners() {
         // Reload the attachment list
         await loadSavedData();
     });
+
+    // Clear Emails Button
+    const clearEmailsBtn = document.getElementById('clear-emails-btn');
+    if (clearEmailsBtn) {
+        clearEmailsBtn.addEventListener('click', async () => {
+            const emailList = document.getElementById('email-list');
+            emailList.value = '';
+            await saveEmailList(); // Save the empty list
+            addLogEntry('Email list cleared', 'info');
+        });
+    }
 }
 
 function switchTab(tabId) {
