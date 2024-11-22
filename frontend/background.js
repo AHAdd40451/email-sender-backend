@@ -1,3 +1,6 @@
+
+const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
+
 let currentState;
 
 async function initializeState() {
@@ -92,7 +95,7 @@ async function handleSendEmails(request, sendResponse) {
 }
 
 async function sendEmail(recipient, data) {
-  const socket = io('http://localhost:5000', {
+  const socket = io(`${API_BASE_URL}`, {
     transports: ['websocket'],
     upgrade: false
   });
