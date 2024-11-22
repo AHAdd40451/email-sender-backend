@@ -6,69 +6,61 @@
 </head>
 <body>
     <div class="container">
+        <div class="header">
+            <h2>Bulk Email Sender</h2>
+            <button id="logout-btn">Logout</button>
+        </div>
+
         <div class="tabs">
             <button class="tab-btn active" data-tab="settings">Settings</button>
             <button class="tab-btn" data-tab="emails">Email List</button>
             <button class="tab-btn" data-tab="template">Template</button>
         </div>
 
+        <!-- SMTP Settings Tab -->
         <div id="settings" class="tab-content active">
             <h3>SMTP Settings</h3>
-            <div class="form-group">
+            <form id="smtp-form">
+                <input type="text" id="smtp-server" placeholder="SMTP Server" required>
+                <input type="number" id="smtp-port" placeholder="SMTP Port" required>
+                <input type="text" id="username" placeholder="Username/Email" required>
+                <input type="password" id="password" placeholder="Password" required>
                 <input type="text" id="sender-name" placeholder="Sender Name">
-                <input type="text" id="smtp-server" placeholder="SMTP Server" value="smtpout.secureserver.net">
-                <input type="number" id="smtp-port" placeholder="SMTP Port" value="587">
-                <input type="email" id="username" placeholder="Email Username">
-                <input type="password" id="password" placeholder="Email Password">
                 <input type="number" id="delay" placeholder="Delay (seconds)" value="5">
-            </div>
+                <button type="submit" class="primary-btn">Save Settings</button>
+            </form>
         </div>
 
+        <!-- Email List Tab -->
         <div id="emails" class="tab-content">
             <h3>Email List</h3>
-            <div class="email-tools">
-                <button id="add-email">Add Email</button>
-                <button id="import-csv">Import CSV</button>
-                <button id="export-csv">Export CSV</button>
+            <div class="email-input-container">
+                <input type="email" id="new-email" placeholder="Enter email address">
+                <button id="add-email-btn" class="primary-btn">Add Email</button>
             </div>
-            <div class="email-list" id="email-list">
-                <!-- Emails will be added here dynamically -->
-            </div>
+            <textarea id="email-list" placeholder="Email addresses will appear here (one per line)" readonly></textarea>
+            <button id="clear-emails-btn" class="danger-btn">Clear All</button>
         </div>
 
+        <!-- Template Tab -->
         <div id="template" class="tab-content">
             <h3>Email Template</h3>
-            <div class="template-form">
-                <input type="text" id="email-subject" placeholder="Email Subject" class="full-width">
-                <textarea 
-                    id="email-body" 
-                    placeholder="Enter your email content here... (HTML or plain text)"
-                    class="full-width template-textarea"
-                ></textarea>
-                <div class="attachment-section">
-                    <input type="file" id="email-attachment" multiple>
-                    <div id="attachment-list"></div>
-                </div>
-            </div>
+            <input type="text" id="email-subject" placeholder="Email Subject" class="full-width">
+            <textarea id="email-body" placeholder="Enter your email content here... (HTML or plain text)" class="full-width"></textarea>
         </div>
 
-        <div class="actions">
-            <button id="save-settings" class="primary-btn">Save Settings</button>
-            <button id="send-emails" class="primary-btn">Send Emails</button>
+        <!-- Send Button -->
+        <div class="send-container">
+            <button id="send-btn" class="send-btn">Send Emails</button>
         </div>
 
-        <div id="status" class="status"></div>
-        <div id="progress" class="progress-bar">
-            <div class="progress-fill"></div>
-        </div>
-        <div id="clear-logs" style="padding-top: 10px; cursor: pointer;">Clear Logs</div>
-
+        <!-- Logs Section -->
         <div class="logs-container">
             <h3>Logs</h3>
             <div id="log-entries" class="log-entries"></div>
         </div>
     </div>
+
     <script src="popup.js"></script>
-    <script src="socket.io.min.js"></script>
 </body>
 </html>

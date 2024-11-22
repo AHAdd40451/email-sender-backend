@@ -10,7 +10,8 @@
     "webRequest"
   ],
   "host_permissions": [
-    "https://email-sender-backend-dyxz.onrender.com/*"
+    "https://email-sender-backend-dyxz.onrender.com/*",
+    "http://localhost:5000/*"
   ],
 
   "action": {

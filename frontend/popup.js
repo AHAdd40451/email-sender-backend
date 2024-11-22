@@ -1,344 +1,321 @@
-const DEBUG = true;
+const API_BASE_URL = 'http://localhost:5000';
 
-function log(...args) {
-    if (DEBUG) {
-        console.log(...args);
-    }
-}
+document.addEventListener('DOMContentLoaded', initializeApp);
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Tab handling
-    const tabs = document.querySelectorAll('.tab-btn');
-    let emailList = new Set();
-    const emailListElement = document.getElementById('email-list');
-    const logEntries = document.getElementById('log-entries');
+async function initializeApp() {
+    console.log('Initializing app...');
 
-    // Tab switching
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            
-            const contents = document.querySelectorAll('.tab-content');
-            contents.forEach(c => c.classList.remove('active'));
-            document.getElementById(tab.dataset.tab).classList.add('active');
-        });
-    });
-
-    // Email list functions
-    function saveEmailList() {
-        chrome.storage.local.get('emailState', (state) => {
-            const currentState = state.emailState || {};
-            currentState.emailList = Array.from(emailList);
-            chrome.storage.local.set({ emailState: currentState });
-        });
-    }
-
-    function loadEmailList() {
-        chrome.storage.local.get('emailState', (state) => {
-            if (state.emailState?.emailList) {
-                emailList = new Set(state.emailState.emailList);
-                updateEmailList();
-            }
-        });
-    }
-
-    function addEmail(email) {
-        if (email && !emailList.has(email)) {
-            emailList.add(email);
-            updateEmailList();
-            saveEmailList();
-        }
-    }
-
-    function removeEmail(email) {
-        emailList.delete(email);
-        updateEmailList();
-        saveEmailList();
-    }
-
-    function updateEmailList() {
-        emailListElement.innerHTML = '';
-        emailList.forEach(email => {
-            const div = document.createElement('div');
-            div.className = 'email-item';
-            div.innerHTML = `
-                <span>${email}</span>
-                <button class="delete-btn">Delete</button>
-            `;
-            div.querySelector('.delete-btn').addEventListener('click', () => removeEmail(email));
-            emailListElement.appendChild(div);
-        });
-    }
-
-    // Add email button
-    document.getElementById('add-email').addEventListener('click', () => {
-        const email = prompt('Enter email address:');
-        if (email) addEmail(email);
-    });
-
-    // Import CSV
-    document.getElementById('import-csv').addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.csv';
-        input.onchange = e => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = event => {
-                const text = event.target.result;
-                const rows = text.split('\n');
-                rows.forEach(row => {
-                    const email = row.trim();
-                    if (email && email !== 'email') addEmail(email);
-                });
-            };
-            reader.readAsText(file);
-        };
-        input.click();
-    });
-
-    // Export CSV
-    document.getElementById('export-csv').addEventListener('click', () => {
-        const csv = Array.from(emailList).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'email_list.csv';
-        a.click();
-    });
-
-    // Save settings
-    document.getElementById('save-settings').addEventListener('click', () => {
-        saveInputValues();
-        showStatus('Settings saved successfully!');
-    });
-
-    // Send emails
-    document.getElementById('send-emails').addEventListener('click', async () => {
-        if (emailList.size === 0) {
-            showStatus('Please add some email addresses first!');
+    try {
+        // Check authentication
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.log('No token found, redirecting to login');
+            window.location.href = 'login.html';
             return;
         }
 
-        addLogEntry('Starting new email process...', 'info');
+        // Setup event listeners first
+        setupEventListeners();
         
-        const files = document.getElementById('email-attachment').files;
-        const attachments = [];
+        // Load initial data
+        await loadSmtpSettings();
         
-        for (let file of files) {
-            const base64Data = await getBase64(file);
-            attachments.push({
-                filename: file.name,
-                content: base64Data,
-                contentType: file.type
-            });
-        }
+        console.log('App initialized successfully');
+        addLogEntry('Application initialized successfully', 'success');
+    } catch (error) {
+        console.error('Error initializing app:', error);
+        addLogEntry(`Error initializing application: ${error.message}`, 'error');
+    }
+}
 
-        const settings = await chrome.storage.local.get('emailState');
-        const config = {
-            ...settings.emailState?.inputValues,
-            emailList: Array.from(emailList),
-            emailSubject: document.getElementById('email-subject').value,
-            emailTemplate: document.getElementById('email-body').value,
-            attachments: attachments
+function setupEventListeners() {
+    // Tab Switching
+    document.querySelectorAll('.tab-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabId = button.getAttribute('data-tab');
+            switchTab(tabId);
+        });
+    });
+
+    // SMTP Form
+    const smtpForm = document.getElementById('smtp-form');
+    if (smtpForm) {
+        smtpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await saveSmtpSettings();
+        });
+    }
+
+    // Email Management
+    const addEmailBtn = document.getElementById('add-email-btn');
+    if (addEmailBtn) {
+        addEmailBtn.addEventListener('click', addEmail);
+    }
+
+    const newEmailInput = document.getElementById('new-email');
+    if (newEmailInput) {
+        newEmailInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addEmail();
+            }
+        });
+    }
+
+    // Send Button
+    const sendBtn = document.getElementById('send-btn');
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendEmails);
+    }
+
+    // Logout Button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('token');
+            window.location.href = 'login.html';
+        });
+    }
+}
+
+function switchTab(tabId) {
+    // Update active tab button
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+    });
+
+    // Update active content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === tabId);
+    });
+}
+
+async function loadInitialData() {
+    await loadSmtpSettings();
+    addLogEntry('Settings loaded', 'info');
+}
+
+function addEmail() {
+    const emailInput = document.getElementById('new-email');
+    const emailList = document.getElementById('email-list');
+    
+    const email = emailInput.value.trim();
+    if (isValidEmail(email)) {
+        const emails = new Set(emailList.value.split('\n').filter(e => e.trim()));
+        if (!emails.has(email)) {
+            emails.add(email);
+            emailList.value = Array.from(emails).join('\n');
+            emailInput.value = '';
+            addLogEntry(`Added email: ${email}`, 'success');
+        } else {
+            addLogEntry('Email already exists in the list', 'warning');
+        }
+    } else {
+        addLogEntry('Please enter a valid email address', 'error');
+    }
+}
+
+async function saveSmtpSettings() {
+    try {
+        const settings = {
+            smtp_server: document.getElementById('smtp-server').value,
+            smtp_port: parseInt(document.getElementById('smtp-port').value),
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value,
+            sender_name: document.getElementById('sender-name').value,
+            delay: parseInt(document.getElementById('delay').value) || 5
         };
 
-        showStatus('Starting email process...');
-        updateProgress(0);
-        
-        try {
-            const response = await fetch('https://email-sender-backend-dyxz.onrender.com/send-emails', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(config)
-            });
-
-            const result = await response.json();
-            showStatus(result.message);
-            updateProgress(100);
-
-        } catch (error) {
-            showStatus(`Error: ${error.message}`);
-            addLogEntry(`Error: ${error.message}`, 'error');
+        // Validate settings
+        if (!settings.smtp_server || !settings.smtp_port || !settings.username || !settings.password) {
+            addLogEntry('All SMTP fields are required', 'error');
+            return;
         }
-    });
 
-    // Helper functions
-    function showStatus(message) {
-        document.getElementById('status').textContent = message;
-    }
+        console.log('Saving settings:', settings); // Debug log
 
-    function updateProgress(percent) {
-        document.querySelector('.progress-fill').style.width = `${percent}%`;
-    }
-
-    // Initialize Socket.IO connection
-    async function initializeSocketAndLogs() {
-        log('Initializing socket connection...');
-        
-        await loadExistingLogs();
-
-        const socket = io('https://email-sender-backend-dyxz.onrender.com', {
-            transports: ['polling'],
-            upgrade: false,
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            path: '/socket.io/',
-            withCredentials: false,
+        const response = await fetch(`${API_BASE_URL}/smtp-settings`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify(settings)
         });
 
-        socket.on('connect', () => {
-            log('Socket connected successfully');
-            console.log('Connected to server');
-            addLogEntry('Connected to server', 'info');
-            showStatus('Connected to server');
-        });
-
-        socket.on('connect_error', (error) => {
-            log('Socket connection error:', error);
-            console.error('Connection error:', error);
-            addLogEntry(`Connection error: ${error.message}`, 'error');
-            showStatus(`Connection error: ${error.message}`);
-        });
-
-        socket.on('log_update', (log) => {
-            console.log('Received log:', log);
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${log.type}`;
-            const timestamp = new Date(log.timestamp).toLocaleTimeString();
-            entry.textContent = `[${timestamp}] ${log.message}`;
-            logEntries.appendChild(entry);
-            logEntries.scrollTop = logEntries.scrollHeight;
-        });
-
-        socket.on('disconnect', () => {
-            console.log('Disconnected from server');
-            addLogEntry('Disconnected from server', 'warning');
-        });
-
-        socket.on('reconnect', (attemptNumber) => {
-            console.log('Reconnected to server');
-            addLogEntry('Reconnected to server', 'info');
-        });
-
-        socket.on('error', (error) => {
-            console.error('Socket error:', error);
-            addLogEntry('Socket error: ' + error.message, 'error');
-        });
-
-        return socket;
-    }
-
-    function addLogEntry(message, level = 'info') {
-        const entry = document.createElement('div');
-        entry.className = `log-entry ${level}`;
-        const timestamp = new Date().toLocaleTimeString();
-        entry.textContent = `[${timestamp}] ${message}`;
-        
-        logEntries.appendChild(entry);
-        logEntries.scrollTop = logEntries.scrollHeight;
-    }
-
-    document.getElementById('clear-logs').addEventListener('click', async () => {
-        try {
-            const logEntries = document.getElementById('log-entries');
-            logEntries.innerHTML = '';
-            
-            await fetch('https://email-sender-backend-dyxz.onrender.com/clear-logs', { 
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            const entry = document.createElement('div');
-            entry.className = 'log-entry info';
-            entry.textContent = 'Logs cleared';
-            logEntries.appendChild(entry);
-        } catch (error) {
-            console.error('Error clearing logs:', error);
-            const entry = document.createElement('div');
-            entry.className = 'log-entry error';
-            entry.textContent = 'Failed to clear logs';
-            logEntries.appendChild(entry);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to save settings');
         }
-    });
 
-    async function loadExistingLogs() {
-        try {
-            logEntries.innerHTML = '';
-            
-            const response = await fetch('https://email-sender-backend-dyxz.onrender.com/get-logs');
-            const result = await response.json();
-            
-            if (result.logs) {
-                result.logs.forEach(log => {
-                    const entry = document.createElement('div');
-                    entry.className = `log-entry ${log.type}`;
-                    const timestamp = new Date(log.timestamp).toLocaleTimeString();
-                    entry.textContent = `[${timestamp}] ${log.message}`;
-                    logEntries.appendChild(entry);
+        const data = await response.json();
+        addLogEntry('SMTP settings saved successfully', 'success');
+        return data;
+
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        addLogEntry(`Failed to save settings: ${error.message}`, 'error');
+        throw error;
+    }
+}
+
+async function loadSmtpSettings() {
+    try {
+        console.log('Loading SMTP settings...'); // Debug log
+
+        const response = await fetch(`${API_BASE_URL}/smtp-settings`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        // Log the response for debugging
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                // Handle unauthorized access
+                localStorage.removeItem('token');
+                window.location.href = 'login.html';
+                return;
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Received non-JSON response from server');
+        }
+
+        const data = await response.json();
+        console.log('Received settings:', data); // Debug log
+
+        if (data.settings) {
+            document.getElementById('smtp-server').value = data.settings.smtp_server || '';
+            document.getElementById('smtp-port').value = data.settings.smtp_port || '';
+            document.getElementById('username').value = data.settings.username || '';
+            document.getElementById('password').value = data.settings.password || '';
+            document.getElementById('sender-name').value = data.settings.sender_name || '';
+            document.getElementById('delay').value = data.settings.delay || 5;
+            addLogEntry('Settings loaded successfully', 'success');
+        } else {
+            addLogEntry('No existing settings found', 'info');
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        addLogEntry(`Failed to load settings: ${error.message}`, 'error');
+    }
+}
+
+async function sendEmails() {
+    try {
+        // First check if SMTP settings exist
+        const smtpServer = document.getElementById('smtp-server').value;
+        if (!smtpServer) {
+            addLogEntry('Please configure SMTP settings first', 'error');
+            switchTab('settings');
+            return;
+        }
+
+        const emailList = document.getElementById('email-list').value
+            .split('\n')
+            .map(email => email.trim())
+            .filter(email => email && isValidEmail(email));
+
+        if (emailList.length === 0) {
+            addLogEntry('No valid email addresses provided', 'error');
+            return;
+        }
+
+        const subject = document.getElementById('email-subject').value;
+        if (!subject) {
+            addLogEntry('Email subject is required', 'error');
+            return;
+        }
+
+        const body = document.getElementById('email-body').value;
+        if (!body) {
+            addLogEntry('Email body is required', 'error');
+            return;
+        }
+
+        addLogEntry('Starting email send process...', 'info');
+        addLogEntry(`Preparing to send to ${emailList.length} recipients...`, 'info');
+
+        const emailData = {
+            emails: emailList,
+            subject: subject,
+            body: body
+        };
+
+        const response = await fetch(`${API_BASE_URL}/send-emails`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify(emailData)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to send emails');
+        }
+
+        // Show success message
+        addLogEntry(data.message, 'success');
+
+        // Show detailed results if available
+        if (data.details) {
+            if (data.details.successful > 0) {
+                addLogEntry(`Successfully sent: ${data.details.successful}`, 'success');
+            }
+            if (data.details.failed > 0) {
+                addLogEntry(`Failed to send: ${data.details.failed}`, 'error');
+            }
+            // Show individual errors if any
+            if (data.details.errors && data.details.errors.length > 0) {
+                data.details.errors.forEach(error => {
+                    addLogEntry(error, 'error');
                 });
-                
-                logEntries.scrollTop = logEntries.scrollHeight;
             }
-        } catch (error) {
-            console.error('Error loading logs:', error);
-            addLogEntry('Failed to load server logs', 'error');
+        }
+
+    } catch (error) {
+        console.error('Error sending emails:', error);
+        addLogEntry(`Failed to send emails: ${error.message}`, 'error');
+    }
+}
+
+// Add this helper function to validate emails
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+// Add this helper function to check SMTP settings before sending
+async function checkSmtpSettings() {
+    const requiredFields = ['smtp-server', 'smtp-port', 'username', 'password'];
+    for (const field of requiredFields) {
+        const value = document.getElementById(field).value;
+        if (!value) {
+            addLogEntry(`SMTP ${field.replace('-', ' ')} is required`, 'error');
+            switchTab('settings');
+            return false;
         }
     }
+    return true;
+}
 
-    function saveInputValues() {
-        chrome.storage.local.get('emailState', (state) => {
-            const currentState = state.emailState || {};
-            currentState.inputValues = {
-                smtpServer: document.getElementById('smtp-server').value,
-                smtpPort: document.getElementById('smtp-port').value,
-                username: document.getElementById('username').value,
-                password: document.getElementById('password').value,
-                senderName: document.getElementById('sender-name').value,
-                delay: document.getElementById('delay').value,
-                emailSubject: document.getElementById('email-subject').value,
-                emailTemplate: document.getElementById('email-body').value,
-                attachments: Array.from(document.getElementById('email-attachment').files)
-            };
-            chrome.storage.local.set({ emailState: currentState });
-        });
-    }
-
-    function loadInputValues() {
-        chrome.storage.local.get('emailState', (state) => {
-            if (state.emailState?.inputValues) {
-                const values = state.emailState.inputValues;
-                document.getElementById('smtp-server').value = values.smtpServer || '';
-                document.getElementById('smtp-port').value = values.smtpPort || '';
-                document.getElementById('username').value = values.username || '';
-                document.getElementById('password').value = values.password || '';
-                document.getElementById('sender-name').value = values.senderName || '';
-                document.getElementById('delay').value = values.delay || '';
-                document.getElementById('email-subject').value = values.emailSubject || '';
-                document.getElementById('email-body').value = values.emailTemplate || '';
-            }
-        });
-    }
-
-    // Initialize
-    loadInputValues();
-    loadEmailList();
-    initializeSocketAndLogs();
-});
-
-// Add this new function to handle file attachments
-async function getBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = error => reject(error);
-    });
+function addLogEntry(message, type = 'info') {
+    const logEntries = document.getElementById('log-entries');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    const timestamp = new Date().toLocaleTimeString();
+    entry.textContent = `[${timestamp}] ${message}`;
+    logEntries.appendChild(entry);
+    logEntries.scrollTop = logEntries.scrollHeight;
 }

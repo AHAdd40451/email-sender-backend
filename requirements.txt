@@ -6,3 +6,7 @@ gunicorn
 gevent
 gevent-websocket
 dnspython
+pymongo
+flask-jwt-extended
+bcrypt
+python-dotenv
