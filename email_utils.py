@@ -109,60 +109,114 @@ class EmailSender:
         logger.info(f"{level.upper()}: {message}")
 
     def send_bulk_emails(self, email_list, subject, body_text, attachments=None):
-        """Send bulk emails with verification and delay"""
-        delay = self.settings.delay or 5
+        """Send bulk emails with improved handling for concurrent users"""
+        batch_size = 50
+        max_retries = 3
         total_emails = len(email_list)
-        success_count = 0
-        failed_count = 0
-        results = []
-        
-        self.log_message(f"Starting to send emails to {total_emails} recipients")
-        self.log_message(f"Using delay of {delay} seconds between emails")
-        
-        for index, recipient_email in enumerate(email_list, 1):
-            try:
-                if self.verify_email(recipient_email):
-                    with self.connect_smtp() as smtp:
-                        msg = self.create_email(subject, recipient_email, body_text, attachments)
-                        smtp.send_message(msg)
-                        success_count += 1
-                        status = f"[{success_count}/{total_emails}] Successfully sent email to {recipient_email}"
-                        self.log_message(status, 'success')
-                        results.append({'email': recipient_email, 'status': 'success', 'message': status})
-                        
-                        if index < total_emails:
-                            wait_time = random.uniform(delay, delay + 2)
-                            next_email = email_list[index] if index < len(email_list) else None
-                            if next_email:
-                                self.log_message(
-                                    f"Waiting {wait_time:.1f} seconds before sending to {next_email}",
-                                    'info',
-                                    {'delay': wait_time, 'next_email': next_email}
-                                )
-                            time.sleep(wait_time)
-                else:
-                    failed_count += 1
-                    status = f"Failed to verify email: {recipient_email}"
-                    self.log_message(status, 'error')
-                    results.append({'email': recipient_email, 'status': 'error', 'message': status})
-            except Exception as e:
-                failed_count += 1
-                status = f"Error sending to {recipient_email}: {str(e)}"
-                self.log_message(status, 'error', {'error': str(e)})
-                results.append({'email': recipient_email, 'status': 'error', 'message': status})
-                time.sleep(2)
-        
-        summary = f"Email sending completed. Success: {success_count}, Failed: {failed_count}"
-        self.log_message(summary, 'info', {
-            'success_count': success_count,
-            'failed_count': failed_count,
-            'total': total_emails
-        })
-        
-        return {
-            'success_count': success_count,
-            'failed_count': failed_count,
-            'total': total_emails,
-            'results': results,
-            'summary': summary
+        results = {
+            'success_count': 0,
+            'failed_count': 0,
+            'results': [],
+            'batches': []
         }
+        
+        # Split into batches
+        batches = [email_list[i:i + batch_size] for i in range(0, total_emails, batch_size)]
+        
+        for batch_num, batch in enumerate(batches, 1):
+            batch_result = self._process_batch(
+                batch=batch,
+                batch_num=batch_num,
+                total_batches=len(batches),
+                subject=subject,
+                body_text=body_text,
+                attachments=attachments,
+                max_retries=max_retries
+            )
+            
+            # Update results
+            results['success_count'] += batch_result['success_count']
+            results['failed_count'] += batch_result['failed_count']
+            results['results'].extend(batch_result['results'])
+            results['batches'].append(batch_result['batch_summary'])
+            
+            # Add delay between batches
+            if batch_num < len(batches):
+                self._smart_delay(batch_result['success_count'])
+        
+        return results
+
+    def _process_batch(self, batch, batch_num, total_batches, subject, body_text, attachments, max_retries):
+        """Process a single batch of emails"""
+        batch_results = {
+            'success_count': 0,
+            'failed_count': 0,
+            'results': [],
+            'batch_summary': {}
+        }
+        
+        start_time = time.time()
+        
+        for email in batch:
+            result = self._send_single_email(
+                email=email,
+                subject=subject,
+                body_text=body_text,
+                attachments=attachments,
+                max_retries=max_retries
+            )
+            
+            if result['status'] == 'success':
+                batch_results['success_count'] += 1
+            else:
+                batch_results['failed_count'] += 1
+            
+            batch_results['results'].append(result)
+        
+        # Calculate batch metrics
+        batch_results['batch_summary'] = {
+            'batch_num': batch_num,
+            'total_batches': total_batches,
+            'processed': len(batch),
+            'success': batch_results['success_count'],
+            'failed': batch_results['failed_count'],
+            'time_taken': time.time() - start_time
+        }
+        
+        return batch_results
+
+    def _smart_delay(self, success_count):
+        """Implement smart delay based on success rate"""
+        base_delay = self.settings.delay or 5
+        if success_count < 10:
+            return time.sleep(base_delay * 2)  # Longer delay if having issues
+        return time.sleep(base_delay)
+
+    def _send_single_email(self, email, subject, body_text, attachments, max_retries):
+        """Send single email with retry logic"""
+        for attempt in range(max_retries):
+            try:
+                if self.verify_email(email):
+                    with self.connect_smtp() as smtp:
+                        msg = self.create_email(subject, email, body_text, attachments)
+                        smtp.send_message(msg)
+                        return {
+                            'email': email,
+                            'status': 'success',
+                            'attempts': attempt + 1
+                        }
+                else:
+                    return {
+                        'email': email,
+                        'status': 'error',
+                        'message': 'Email verification failed'
+                    }
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    return {
+                        'email': email,
+                        'status': 'error',
+                        'message': str(e),
+                        'attempts': attempt + 1
+                    }
+                time.sleep(2 ** attempt)  # Exponential backoff
