@@ -127,6 +127,47 @@ function setupEventListeners() {
             }
         });
     }
+
+    document.getElementById('attachments').addEventListener('change', function(e) {
+        const attachmentList = document.getElementById('attachment-list');
+        attachmentList.innerHTML = '';
+        
+        for (const file of this.files) {
+            const item = document.createElement('div');
+            item.className = 'attachment-item';
+            
+            const name = document.createElement('span');
+            name.textContent = `${file.name} (${formatFileSize(file.size)})`;
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '×';
+            removeBtn.onclick = () => {
+                // Remove file from input
+                const dt = new DataTransfer();
+                const files = [...this.files];
+                const index = files.indexOf(file);
+                files.splice(index, 1);
+                files.forEach(f => dt.items.add(f));
+                this.files = dt.files;
+                item.remove();
+            };
+            
+            item.appendChild(name);
+            item.appendChild(removeBtn);
+            attachmentList.appendChild(item);
+        }
+    });
+
+    document.getElementById('attachments').addEventListener('change', async function(e) {
+        const attachmentList = document.getElementById('attachment-list');
+        attachmentList.innerHTML = '';
+        
+        // Save the template with new attachments
+        await saveEmailTemplate();
+        
+        // Reload the attachment list
+        await loadSavedData();
+    });
 }
 
 function switchTab(tabId) {
@@ -292,13 +333,34 @@ async function sendEmails() {
             return;
         }
 
+        // Handle attachments
+        const attachmentInput = document.getElementById('attachments');
+        const attachments = [];
+        
+        for (const file of attachmentInput.files) {
+            const reader = new FileReader();
+            const attachment = await new Promise((resolve, reject) => {
+                reader.onload = () => {
+                    resolve({
+                        filename: file.name,
+                        content: reader.result.split(',')[1], // Get base64 content
+                        contentType: file.type
+                    });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            attachments.push(attachment);
+        }
+
         addLogEntry('Starting email send process...', 'info');
         addLogEntry(`Preparing to send to ${emailList.length} recipients...`, 'info');
 
         const emailData = {
             emails: emailList,
             subject: subject,
-            body: body
+            body: body,
+            attachments: attachments
         };
 
         const response = await fetch(`${API_BASE_URL}/send-emails`, {
@@ -476,6 +538,36 @@ async function loadSavedData() {
         if (result.emailTemplate) {
             document.getElementById('email-subject').value = result.emailTemplate.subject || '';
             document.getElementById('email-body').value = result.emailTemplate.body || '';
+            
+            // Load attachments
+            if (result.emailTemplate.attachments) {
+                const attachmentList = document.getElementById('attachment-list');
+                attachmentList.innerHTML = '';
+                
+                result.emailTemplate.attachments.forEach(attachment => {
+                    const item = document.createElement('div');
+                    item.className = 'attachment-item';
+                    
+                    const name = document.createElement('span');
+                    name.textContent = `${attachment.filename} (${formatFileSize(attachment.size)})`;
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '×';
+                    removeBtn.onclick = async () => {
+                        item.remove();
+                        // Remove attachment from storage
+                        const template = result.emailTemplate;
+                        template.attachments = template.attachments.filter(
+                            a => a.filename !== attachment.filename
+                        );
+                        await chrome.storage.local.set({ emailTemplate: template });
+                    };
+                    
+                    item.appendChild(name);
+                    item.appendChild(removeBtn);
+                    attachmentList.appendChild(item);
+                });
+            }
         }
         
         // Load email list
@@ -494,15 +586,35 @@ async function saveEmailTemplate() {
     try {
         const subject = document.getElementById('email-subject').value;
         const body = document.getElementById('email-body').value;
+        const attachmentInput = document.getElementById('attachments');
+        const attachments = [];
+        
+        for (const file of attachmentInput.files) {
+            const reader = new FileReader();
+            const attachment = await new Promise((resolve, reject) => {
+                reader.onload = () => {
+                    resolve({
+                        filename: file.name,
+                        content: reader.result.split(',')[1],
+                        contentType: file.type,
+                        size: file.size
+                    });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            attachments.push(attachment);
+        }
         
         await chrome.storage.local.set({
             emailTemplate: {
                 subject: subject,
-                body: body
+                body: body,
+                attachments: attachments
             }
         });
         
-        addLogEntry('Email template saved', 'success');
+        addLogEntry('Email template saved with attachments', 'success');
     } catch (error) {
         console.error('Error saving template:', error);
         addLogEntry('Failed to save template', 'error');
@@ -592,4 +704,12 @@ async function handleCsvImport(file) {
         console.error('Error importing CSV:', error);
         addLogEntry(`Failed to import CSV: ${error.message}`, 'error');
     }
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }

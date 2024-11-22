@@ -101,7 +101,14 @@ async function sendEmail(recipient, data) {
     socket.emit('send_email', {
       recipient,
       senderName: data.senderName || 'Default Sender',
+      subject: data.subject,
+      body: data.body,
+      attachments: data.attachments || [],
       ...data
+    });
+
+    socket.on('log_update', (logData) => {
+      addLog(logData.message, logData.type);
     });
 
     socket.on('email_result', (result) => {

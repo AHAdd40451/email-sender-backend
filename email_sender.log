@@ -96,3 +96,73 @@
 2024-11-22 18:50:50,964 - INFO - MX records found for domain gmail.com
 2024-11-22 18:50:56,204 - SUCCESS - [3/3] Successfully sent email to ahadkhan40451@gmail.com
 2024-11-22 18:50:56,377 - INFO - Email sending completed. Success: 3, Failed: 0
+2024-11-22 19:06:42,971 - INFO - Starting to send emails to 3 recipients
+2024-11-22 19:06:43,026 - INFO - Using delay of 5 seconds between emails
+2024-11-22 19:06:43,089 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:06:43,161 - INFO - MX records found for domain gmail.com
+2024-11-22 19:06:48,443 - SUCCESS - [1/3] Successfully sent email to ahadd40451@gmail.com
+2024-11-22 19:06:48,491 - INFO - Waiting 6.8 seconds before sending to saadkhan40451@gmail.com
+2024-11-22 19:06:55,444 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:06:55,509 - INFO - MX records found for domain gmail.com
+2024-11-22 19:07:00,638 - SUCCESS - [2/3] Successfully sent email to saadkhan40451@gmail.com
+2024-11-22 19:07:00,693 - INFO - Waiting 5.8 seconds before sending to ahadkhan40451@gmail.com
+2024-11-22 19:07:06,636 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:07:06,718 - INFO - MX records found for domain gmail.com
+2024-11-22 19:07:11,855 - SUCCESS - [3/3] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 19:07:12,028 - INFO - Email sending completed. Success: 3, Failed: 0
+2024-11-22 19:22:25,485 - INFO - Starting to send emails to 3 recipients
+2024-11-22 19:22:25,554 - INFO - Using delay of 5 seconds between emails
+2024-11-22 19:22:25,601 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:22:25,674 - INFO - MX records found for domain gmail.com
+2024-11-22 19:22:28,419 - SUCCESS - [1/3] Successfully sent email to ahadd40451@gmail.com
+2024-11-22 19:22:28,467 - INFO - Waiting 5.9 seconds before sending to saadkhan40451@gmail.com
+2024-11-22 19:22:34,611 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:22:34,733 - INFO - MX records found for domain gmail.com
+2024-11-22 19:22:36,961 - SUCCESS - [2/3] Successfully sent email to saadkhan40451@gmail.com
+2024-11-22 19:22:37,010 - INFO - Waiting 6.1 seconds before sending to ahadkhan40451@gmail.com
+2024-11-22 19:22:43,296 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:22:43,375 - INFO - MX records found for domain gmail.com
+2024-11-22 19:22:45,454 - SUCCESS - [3/3] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 19:22:45,634 - INFO - Email sending completed. Success: 3, Failed: 0
+2024-11-22 19:25:48,888 - INFO - Starting to send emails to 3 recipients
+2024-11-22 19:25:48,973 - INFO - Using delay of 5 seconds between emails
+2024-11-22 19:25:49,027 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:25:49,093 - INFO - MX records found for domain gmail.com
+2024-11-22 19:25:54,732 - SUCCESS - [1/3] Successfully sent email to ahadd40451@gmail.com
+2024-11-22 19:25:54,790 - INFO - Waiting 6.8 seconds before sending to saadkhan40451@gmail.com
+2024-11-22 19:26:01,764 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:26:01,830 - INFO - MX records found for domain gmail.com
+2024-11-22 19:26:07,410 - SUCCESS - [2/3] Successfully sent email to saadkhan40451@gmail.com
+2024-11-22 19:26:07,458 - INFO - Waiting 6.9 seconds before sending to ahadkhan40451@gmail.com
+2024-11-22 19:26:14,543 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:26:14,611 - INFO - MX records found for domain gmail.com
+2024-11-22 19:26:20,071 - SUCCESS - [3/3] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 19:26:20,246 - INFO - Email sending completed. Success: 3, Failed: 0
+2024-11-22 19:29:52,744 - INFO - Starting to send emails to 3 recipients
+2024-11-22 19:29:52,816 - INFO - Using delay of 5 seconds between emails
+2024-11-22 19:29:52,865 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:29:52,931 - INFO - MX records found for domain gmail.com
+2024-11-22 19:29:54,971 - SUCCESS - [1/3] Successfully sent email to ahadd40451@gmail.com
+2024-11-22 19:29:55,030 - INFO - Waiting 6.6 seconds before sending to saadkhan40451@gmail.com
+2024-11-22 19:30:01,809 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:30:01,871 - INFO - MX records found for domain gmail.com
+2024-11-22 19:30:03,601 - SUCCESS - [2/3] Successfully sent email to saadkhan40451@gmail.com
+2024-11-22 19:30:03,663 - INFO - Waiting 5.3 seconds before sending to ahadkhan40451@gmail.com
+2024-11-22 19:30:09,190 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:30:09,264 - INFO - MX records found for domain gmail.com
+2024-11-22 19:30:11,724 - SUCCESS - [3/3] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 19:30:11,915 - INFO - Email sending completed. Success: 3, Failed: 0
+2024-11-22 19:30:41,049 - INFO - Starting to send emails to 3 recipients
+2024-11-22 19:30:41,108 - INFO - Using delay of 5 seconds between emails
+2024-11-22 19:30:41,165 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:30:41,226 - INFO - MX records found for domain gmail.com
+2024-11-22 19:30:43,674 - SUCCESS - [1/3] Successfully sent email to ahadd40451@gmail.com
+2024-11-22 19:30:43,721 - INFO - Waiting 6.6 seconds before sending to saadkhan40451@gmail.com
+2024-11-22 19:30:50,576 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:30:50,674 - INFO - MX records found for domain gmail.com
+2024-11-22 19:30:52,967 - SUCCESS - [2/3] Successfully sent email to saadkhan40451@gmail.com
+2024-11-22 19:30:53,015 - INFO - Waiting 6.7 seconds before sending to ahadkhan40451@gmail.com
+2024-11-22 19:30:59,903 - INFO - Verifying email domain: gmail.com
+2024-11-22 19:30:59,956 - INFO - MX records found for domain gmail.com
+2024-11-22 19:31:02,028 - SUCCESS - [3/3] Successfully sent email to ahadkhan40451@gmail.com
+2024-11-22 19:31:02,235 - INFO - Email sending completed. Success: 3, Failed: 0
