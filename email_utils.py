@@ -10,7 +10,6 @@ from dns import resolver
 import logging
 from datetime import datetime
 import smtplib
-from models import Log
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +19,7 @@ class EmailSender:
         self.user_id = user_id
         self.domain = smtp_settings.smtp_server.split('.')[-2:]
         self.domain = '.'.join(self.domain)
+        self.logger = logging.getLogger(__name__)
 
     def create_email(self, subject, recipient_email, html_content, attachments=None):
         """Create a multipart email with optional attachments"""
@@ -50,9 +50,9 @@ class EmailSender:
                         filename=attachment['filename']
                     )
                     msg.attach(part)
-                    logger.info(f"Attached file: {attachment['filename']}")
+                    self.logger.info(f"Attached file: {attachment['filename']}")
                 except Exception as e:
-                    logger.error(f"Failed to attach file {attachment['filename']}: {str(e)}")
+                    self.logger.error(f"Failed to attach file {attachment['filename']}: {str(e)}")
         
         return msg
 
@@ -95,18 +95,9 @@ class EmailSender:
         return server
 
     def log_message(self, message, level='info', details=None):
-        """Log message to both file and database"""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
-        
-        # Log to file
-        with open('email_sender.log', 'a') as f:
-            f.write(f"{timestamp} - {level.upper()} - {message}\n")
-        
-        # Log to database
-        Log.add(self.user_id, message, level, details)
-        
-        # Log to console
-        logger.info(f"{level.upper()}: {message}")
+        """Log message to file"""
+        from app import save_log  # Import here to avoid circular imports
+        save_log(self.user_id, 'email_sender', message, level, details)
 
     def send_bulk_emails(self, email_list, subject, body_text, attachments=None):
         """Send bulk emails with improved handling for concurrent users"""

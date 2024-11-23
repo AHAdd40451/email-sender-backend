@@ -1,0 +1,4 @@
+{"timestamp": "2024-11-23T10:51:27.813416", "action": "send_emails", "message": "Starting email send to 1 recipients", "level": "info", "details": null}
+{"timestamp": "2024-11-23T10:51:28.247203", "action": "email_sender", "message": "Verifying email domain: gmail.com", "level": "info", "details": null}
+{"timestamp": "2024-11-23T10:51:28.382319", "action": "email_sender", "message": "MX records found for domain gmail.com", "level": "info", "details": null}
+{"timestamp": "2024-11-23T10:51:35.667872", "action": "send_emails", "message": "Email sending completed. Success: 1, Failed: 0", "level": "info", "details": null}
