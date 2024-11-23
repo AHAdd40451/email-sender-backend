@@ -10,7 +10,7 @@
     "webRequest"
   ],
   "host_permissions": [
-    "https://email-sender-backend-dyxz.onrender.com/*",
+    "https://email-sender-backend-production.up.railway.app/*",
     "http://localhost:5000/*"
   ],
 

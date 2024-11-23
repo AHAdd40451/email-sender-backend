@@ -10,6 +10,9 @@ from email.mime.multipart import MIMEMultipart
 from bson import ObjectId
 from email_utils import EmailSender
 from datetime import datetime
+from flask_socketio import SocketIO
+from queue_manager import EmailQueue
+import threading
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +34,8 @@ CORS(app, resources={
 })
 
 jwt = JWTManager(app)
+socketio = SocketIO(app, async_mode='eventlet')
+email_queue = EmailQueue()
 
 @app.route('/smtp-settings', methods=['GET'])
 @jwt_required()
@@ -333,6 +338,52 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
+
+@socketio.on('send_email_batch')
+def handle_email_batch(data):
+    user_id = get_jwt_identity()
+    batch = data['recipients']
+    
+    # Add to queue
+    email_queue.add_batch(user_id, {
+        'recipients': batch,
+        'subject': data['subject'],
+        'body': data['body'],
+        'attachments': data.get('attachments', [])
+    })
+
+    # Process in background
+    thread = threading.Thread(target=process_email_batch, args=(user_id,))
+    thread.daemon = True
+    thread.start()
+
+def process_email_batch(user_id):
+    while True:
+        batch = email_queue.get_next_batch(user_id)
+        if not batch:
+            break
+
+        results = {
+            'successful': [],
+            'failed': []
+        }
+
+        for recipient in batch['recipients']:
+            try:
+                # Your existing email sending logic here
+                send_single_email(recipient, batch)
+                results['successful'].append(recipient)
+            except Exception as e:
+                results['failed'].append({
+                    'email': recipient,
+                    'error': str(e)
+                })
+
+        socketio.emit('batch_result', {
+            'status': 'success',
+            'successful': results['successful'],
+            'failed': results['failed']
+        })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
