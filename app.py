@@ -11,6 +11,7 @@ from email.mime.multipart import MIMEMultipart
 from bson import ObjectId
 from email_utils import EmailSender
 from datetime import datetime
+from flask_socketio import SocketIO, emit, join_room
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +23,7 @@ if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
 def save_log(user_id, action, message, level='info', details=None):
-    """Save log to user-specific file"""
+    """Save log to user-specific file and emit via socket"""
     try:
         timestamp = datetime.utcnow().isoformat()
         log_entry = {
@@ -33,11 +34,14 @@ def save_log(user_id, action, message, level='info', details=None):
             'details': details
         }
         
+        # Save to file
         log_file = os.path.join(LOG_DIR, f"{user_id}.log")
-        
         with open(log_file, 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
             
+        # Emit via socket
+        socketio.emit(f'logs_{user_id}', log_entry, room=f'user_{user_id}')
+        
         logger.info(f"[{user_id}] {level.upper()}: {message}")
         
     except Exception as e:
@@ -91,6 +95,16 @@ CORS(app, resources={
 })
 
 jwt = JWTManager(app)
+
+# Add Socket.IO
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+@socketio.on('join')
+def on_join(data):
+    user_id = data.get('userId')
+    if user_id:
+        join_room(f'user_{user_id}')
+        emit('logs_message', {'message': 'Connected to log stream'}, room=f'user_{user_id}')
 
 @app.route('/smtp-settings', methods=['GET'])
 @jwt_required()
@@ -364,4 +378,4 @@ def after_request(response):
     return response
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    socketio.run(app, debug=True, port=5000)

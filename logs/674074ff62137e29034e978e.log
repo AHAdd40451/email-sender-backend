@@ -1,4 +1,4 @@
-{"timestamp": "2024-11-23T11:06:55.652686", "action": "send_emails", "message": "Starting email send to 1 recipients", "level": "info", "details": null}
-{"timestamp": "2024-11-23T11:06:55.763424", "action": "email_sender", "message": "Verifying email domain: gmail.com", "level": "info", "details": null}
-{"timestamp": "2024-11-23T11:06:55.779510", "action": "email_sender", "message": "MX records found for domain gmail.com", "level": "info", "details": null}
-{"timestamp": "2024-11-23T11:07:01.814980", "action": "send_emails", "message": "Email sending completed. Success: 1, Failed: 0", "level": "info", "details": null}
+{"timestamp": "2024-11-23T11:35:21.357125", "action": "send_emails", "message": "Starting email send to 1 recipients", "level": "info", "details": null}
+{"timestamp": "2024-11-23T11:35:21.459449", "action": "email_sender", "message": "Verifying email domain: gmail.com", "level": "info", "details": null}
+{"timestamp": "2024-11-23T11:35:21.473077", "action": "email_sender", "message": "MX records found for domain gmail.com", "level": "info", "details": null}
+{"timestamp": "2024-11-23T11:35:26.912272", "action": "send_emails", "message": "Email sending completed. Success: 1, Failed: 0", "level": "info", "details": null}

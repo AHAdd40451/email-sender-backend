@@ -1,13 +1,69 @@
 import config from './config.js';
 const { API_BASE_URL } = config;
 
+// Add this after your other imports
+let socket;
+
+function initializeSocket(userId) {
+    try {
+        socket = io(API_BASE_URL, {
+            transports: ['websocket'],
+            upgrade: false,
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 3
+        });
+        
+        socket.on('connect', () => {
+            console.log('Connected to WebSocket');
+        });
+
+        socket.on(`logs_${userId}`, (logEntry) => {
+            addLogEntryToUI(logEntry);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from WebSocket');
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+        });
+
+    } catch (error) {
+        console.error('Socket initialization error:', error);
+    }
+}
+
+function addLogEntryToUI(logEntry) {
+    const logEntries = document.getElementById('log-entries');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${logEntry.level}`;
+    
+    const timestamp = new Date(logEntry.timestamp).toLocaleString();
+    
+    entry.innerHTML = `
+        <span class="log-timestamp">[${timestamp}]</span>
+        <span class="log-level ${logEntry.level}">${logEntry.level.toUpperCase()}</span>
+        <span class="log-message">${logEntry.message}</span>
+    `;
+    
+    if (logEntry.details) {
+        const detailsSpan = document.createElement('span');
+        detailsSpan.className = 'log-details';
+        detailsSpan.textContent = JSON.stringify(logEntry.details);
+        entry.appendChild(detailsSpan);
+    }
+    
+    logEntries.insertBefore(entry, logEntries.firstChild);
+}
+
 document.addEventListener('DOMContentLoaded', initializeApp);
 
 async function initializeApp() {
     console.log('Initializing app...');
 
     try {
-        // Simple token check
         const token = localStorage.getItem('token');
         if (!token) {
             console.log('No token found, redirecting to login');
@@ -15,17 +71,22 @@ async function initializeApp() {
             return;
         }
 
-        // Continue with app initialization
+        // Get user ID from JWT token
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const userId = payload.sub; // or however you store the user ID in the token
+
+        // Initialize WebSocket connection
+        initializeSocket(userId);
+
+        // Continue with other initialization
         setupEventListeners();
         await loadSmtpSettings();
         await loadLogs();
         await loadSavedData();
         
         console.log('App initialized successfully');
-        addLogEntry('Application initialized successfully', 'success');
     } catch (error) {
         console.error('Error initializing app:', error);
-        addLogEntry(`Error initializing application: ${error.message}`, 'error');
     }
 }
 
@@ -117,7 +178,7 @@ function setupEventListeners() {
                 if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
                     handleCsvImport(file);
                 } else {
-                    addLogEntry('Please select a valid CSV file', 'error');
+                    console.error('Please select a valid CSV file');
                 }
                 // Reset file input
                 csvFileInput.value = '';
@@ -137,7 +198,7 @@ function setupEventListeners() {
             name.textContent = `${file.name} (${formatFileSize(file.size)})`;
             
             const removeBtn = document.createElement('button');
-            removeBtn.textContent = '×';
+            removeBtn.textContent = '';
             removeBtn.onclick = () => {
                 // Remove file from input
                 const dt = new DataTransfer();
@@ -173,7 +234,6 @@ function setupEventListeners() {
             const emailList = document.getElementById('email-list');
             emailList.value = '';
             await saveEmailList(); // Save the empty list
-            addLogEntry('Email list cleared', 'info');
         });
     }
 }
@@ -192,7 +252,6 @@ function switchTab(tabId) {
 
 async function loadInitialData() {
     await loadSmtpSettings();
-    addLogEntry('Settings loaded', 'info');
 }
 
 function addEmail() {
@@ -206,63 +265,44 @@ function addEmail() {
             emails.add(email);
             emailList.value = Array.from(emails).join('\n');
             emailInput.value = '';
-            addLogEntry(`Added email: ${email}`, 'success');
         } else {
-            addLogEntry('Email already exists in the list', 'warning');
+            console.error('Email already exists in the list');
         }
     } else {
-        addLogEntry('Please enter a valid email address', 'error');
+        console.error('Please enter a valid email address');
     }
 }
 
 async function saveSmtpSettings() {
     try {
-        const settings = {
-            smtp_server: document.getElementById('smtp-server').value,
-            smtp_port: parseInt(document.getElementById('smtp-port').value),
-            username: document.getElementById('username').value,
-            password: document.getElementById('password').value,
-            sender_name: document.getElementById('sender-name').value,
-            delay: parseInt(document.getElementById('delay').value) || 5
-        };
-
-        // Validate settings
-        if (!settings.smtp_server || !settings.smtp_port || !settings.username || !settings.password) {
-            addLogEntry('All SMTP fields are required', 'error');
-            return;
-        }
-
-        console.log('Saving settings:', settings); // Debug log
-
         const response = await fetch(`${API_BASE_URL}/smtp-settings`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify(settings)
+            body: JSON.stringify({
+                smtp_server: document.getElementById('smtp-server').value,
+                smtp_port: document.getElementById('smtp-port').value,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                sender_name: document.getElementById('sender-name').value,
+                delay: document.getElementById('delay').value
+            })
         });
 
+        const data = await response.json();
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to save settings');
+            throw new Error(data.message || 'Failed to save settings');
         }
 
-        const data = await response.json();
-        addLogEntry('SMTP settings saved successfully', 'success');
-        return data;
-
     } catch (error) {
-        console.error('Error saving settings:', error);
-        addLogEntry(`Failed to save settings: ${error.message}`, 'error');
-        throw error;
+        console.error('Error saving SMTP settings:', error);
     }
 }
 
 async function loadSmtpSettings() {
     try {
-        console.log('Loading SMTP settings...'); // Debug log
-
         const response = await fetch(`${API_BASE_URL}/smtp-settings`, {
             method: 'GET',
             headers: {
@@ -270,9 +310,6 @@ async function loadSmtpSettings() {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-
-        // Log the response for debugging
-        console.log('Response status:', response.status);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -284,7 +321,6 @@ async function loadSmtpSettings() {
         }
 
         const data = await response.json();
-        console.log('Received settings:', data); // Debug log
 
         if (data.settings) {
             document.getElementById('smtp-server').value = data.settings.smtp_server || '';
@@ -293,13 +329,9 @@ async function loadSmtpSettings() {
             document.getElementById('password').value = data.settings.password || '';
             document.getElementById('sender-name').value = data.settings.sender_name || '';
             document.getElementById('delay').value = data.settings.delay || 5;
-            addLogEntry('Settings loaded successfully', 'success');
-        } else {
-            addLogEntry('No existing settings found', 'info');
         }
     } catch (error) {
         console.error('Error loading settings:', error);
-        addLogEntry(`Failed to load settings: ${error.message}`, 'error');
     }
 }
 
@@ -308,7 +340,7 @@ async function sendEmails() {
         // First check if SMTP settings exist
         const smtpServer = document.getElementById('smtp-server').value;
         if (!smtpServer) {
-            addLogEntry('Please configure SMTP settings first', 'error');
+            console.error('Please configure SMTP settings first');
             switchTab('settings');
             return;
         }
@@ -319,19 +351,19 @@ async function sendEmails() {
             .filter(email => email && isValidEmail(email));
 
         if (emailList.length === 0) {
-            addLogEntry('No valid email addresses provided', 'error');
+            console.error('No valid email addresses provided');
             return;
         }
 
         const subject = document.getElementById('email-subject').value;
         if (!subject) {
-            addLogEntry('Email subject is required', 'error');
+            console.error('Email subject is required');
             return;
         }
 
         const body = document.getElementById('email-body').value;
         if (!body) {
-            addLogEntry('Email body is required', 'error');
+            console.error('Email body is required');
             return;
         }
 
@@ -355,8 +387,8 @@ async function sendEmails() {
             attachments.push(attachment);
         }
 
-        addLogEntry('Starting email send process...', 'info');
-        addLogEntry(`Preparing to send to ${emailList.length} recipients...`, 'info');
+        console.info('Starting email send process...');
+        console.info(`Preparing to send to ${emailList.length} recipients...`);
 
         const emailData = {
             emails: emailList,
@@ -381,27 +413,26 @@ async function sendEmails() {
         }
 
         // Show success message
-        addLogEntry(data.message, 'success');
+        console.info(data.message);
 
         // Show detailed results if available
         if (data.details) {
             if (data.details.successful > 0) {
-                addLogEntry(`Successfully sent: ${data.details.successful}`, 'success');
+                console.info(`Successfully sent: ${data.details.successful}`);
             }
             if (data.details.failed > 0) {
-                addLogEntry(`Failed to send: ${data.details.failed}`, 'error');
+                console.error(`Failed to send: ${data.details.failed}`);
             }
             // Show individual errors if any
             if (data.details.errors && data.details.errors.length > 0) {
                 data.details.errors.forEach(error => {
-                    addLogEntry(error, 'error');
+                    console.error(error);
                 });
             }
         }
 
     } catch (error) {
         console.error('Error sending emails:', error);
-        addLogEntry(`Failed to send emails: ${error.message}`, 'error');
     }
 }
 
@@ -417,22 +448,12 @@ async function checkSmtpSettings() {
     for (const field of requiredFields) {
         const value = document.getElementById(field).value;
         if (!value) {
-            addLogEntry(`SMTP ${field.replace('-', ' ')} is required`, 'error');
+            console.error(`SMTP ${field.replace('-', ' ')} is required`);
             switchTab('settings');
             return false;
         }
     }
     return true;
-}
-
-function addLogEntry(message, type = 'info') {
-    const logEntries = document.getElementById('log-entries');
-    const entry = document.createElement('div');
-    entry.className = `log-entry ${type}`;
-    const timestamp = new Date().toLocaleTimeString();
-    entry.textContent = `[${timestamp}] ${message}`;
-    logEntries.appendChild(entry);
-    logEntries.scrollTop = logEntries.scrollHeight;
 }
 
 async function loadLogs() {
@@ -505,7 +526,6 @@ async function loadLogs() {
 
     } catch (error) {
         console.error('Error loading logs:', error);
-        addLogEntry(`Failed to load logs: ${error.message}`, 'error');
     }
 }
 
@@ -522,13 +542,10 @@ async function clearLogs() {
             throw new Error('Failed to clear logs');
         }
 
-        const data = await response.json();
-        addLogEntry(data.message, 'success');
         await loadLogs(); // Reload logs after clearing
 
     } catch (error) {
         console.error('Error clearing logs:', error);
-        addLogEntry('Failed to clear logs', 'error');
     }
 }
 
@@ -579,7 +596,6 @@ async function loadSavedData() {
         
     } catch (error) {
         console.error('Error loading saved data:', error);
-        addLogEntry('Failed to load saved data', 'error');
     }
 }
 
@@ -615,11 +631,8 @@ async function saveEmailTemplate() {
                 attachments: attachments
             }
         });
-        
-        addLogEntry('Email template saved with attachments', 'success');
     } catch (error) {
         console.error('Error saving template:', error);
-        addLogEntry('Failed to save template', 'error');
     }
 }
 
@@ -632,11 +645,8 @@ async function saveEmailList() {
         await chrome.storage.local.set({
             emailList: emailList
         });
-        
-        addLogEntry('Email list saved', 'success');
     } catch (error) {
         console.error('Error saving email list:', error);
-        addLogEntry('Failed to save email list', 'error');
     }
 }
 
@@ -687,13 +697,13 @@ async function handleCsvImport(file) {
             await saveEmailList();
 
             // Show import results
-            addLogEntry(`CSV Import Results:`, 'info');
-            addLogEntry(`- ${importCount} emails imported successfully`, 'success');
+            console.info(`CSV Import Results:`);
+            console.info(`- ${importCount} emails imported successfully`);
             if (duplicateCount > 0) {
-                addLogEntry(`- ${duplicateCount} duplicate emails skipped`, 'warning');
+                console.info(`- ${duplicateCount} duplicate emails skipped`);
             }
             if (invalidCount > 0) {
-                addLogEntry(`- ${invalidCount} invalid emails skipped`, 'error');
+                console.error(`- ${invalidCount} invalid emails skipped`);
             }
         };
 
@@ -704,7 +714,6 @@ async function handleCsvImport(file) {
         reader.readAsText(file);
     } catch (error) {
         console.error('Error importing CSV:', error);
-        addLogEntry(`Failed to import CSV: ${error.message}`, 'error');
     }
 }
 
