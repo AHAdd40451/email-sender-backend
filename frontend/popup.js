@@ -1,5 +1,5 @@
-// const API_BASE_URL = 'http://localhost:5000';
-const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
+const API_BASE_URL = 'http://127.0.0.1:5000';
+// const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
 
 document.addEventListener('DOMContentLoaded', initializeApp);
 
@@ -386,32 +386,64 @@ async function sendEmails() {
 
         const data = await response.json();
 
-        if (!response.ok) {
-            throw new Error(data.message || 'Failed to send emails');
-        }
-
-        // Show success message
-        addLogEntry(data.message, 'success');
-
-        // Show detailed results if available
-        if (data.details) {
-            if (data.details.successful > 0) {
-                addLogEntry(`Successfully sent: ${data.details.successful}`, 'success');
-            }
-            if (data.details.failed > 0) {
-                addLogEntry(`Failed to send: ${data.details.failed}`, 'error');
-            }
-            // Show individual errors if any
-            if (data.details.errors && data.details.errors.length > 0) {
-                data.details.errors.forEach(error => {
-                    addLogEntry(error, 'error');
-                });
-            }
+        if (data.status === 'success') {
+            // Start polling for job status
+            data.job_ids.forEach(jobId => {
+                pollJobStatus(jobId);
+            });
+            
+            addLogEntry('Emails queued successfully', 'success');
+        } else {
+            throw new Error(data.message);
         }
 
     } catch (error) {
         console.error('Error sending emails:', error);
         addLogEntry(`Failed to send emails: ${error.message}`, 'error');
+    }
+}
+
+async function pollJobStatus(jobId) {
+    const pollInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/job-status/${jobId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'finished') {
+                clearInterval(pollInterval);
+                updateJobResults(data.result);
+            } else if (data.status === 'failed') {
+                clearInterval(pollInterval);
+                addLogEntry(`Job failed: ${data.error}`, 'error');
+            } else {
+                updateJobProgress(data.progress);
+            }
+
+        } catch (error) {
+            console.error('Error polling job status:', error);
+            clearInterval(pollInterval);
+        }
+    }, 5000); // Poll every 5 seconds
+}
+
+function updateJobProgress(progress) {
+    if (progress.current && progress.total) {
+        const percentage = Math.round((progress.current / progress.total) * 100);
+        addLogEntry(`Processing: ${percentage}% complete`, 'info');
+    }
+}
+
+function updateJobResults(results) {
+    if (results) {
+        addLogEntry(`Sent successfully: ${results.successful}`, 'success');
+        if (results.failed > 0) {
+            addLogEntry(`Failed: ${results.failed}`, 'error');
+        }
     }
 }
 

@@ -1,5 +1,5 @@
-// const API_BASE_URL = 'http://localhost:5000';
-const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
+const API_BASE_URL = 'http://127.0.0.1:5000';
+// const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
 
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');

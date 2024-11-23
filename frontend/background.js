@@ -1,6 +1,6 @@
 
-const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
-
+// const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
+const API_BASE_URL = 'http://127.0.0.1:5000';
 let currentState;
 
 async function initializeState() {

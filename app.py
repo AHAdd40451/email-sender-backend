@@ -10,6 +10,9 @@ from email.mime.multipart import MIMEMultipart
 from bson import ObjectId
 from email_utils import EmailSender
 from datetime import datetime
+from queue_config import high_priority_queue, default_queue, low_priority_queue
+from rq.job import Job
+from redis import Redis
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -192,50 +195,85 @@ def send_emails():
     try:
         user_id = get_jwt_identity()
         data = request.json
-        logger.info(f"Received email request for user {user_id}")
         
-        # Validate input
         if not data.get('emails') or not data.get('subject') or not data.get('body'):
             return jsonify({
                 'status': 'error',
                 'message': 'Emails, subject, and body are required'
             }), 400
-
-        # Get SMTP settings
+            
+        # Validate SMTP settings
         smtp_settings = SmtpSettings.get_by_user_id(user_id)
         if not smtp_settings:
             return jsonify({
                 'status': 'error',
                 'message': 'Please configure SMTP settings first'
             }), 400
-
-        # Initialize email sender with user_id
-        email_sender = EmailSender(smtp_settings, user_id)
-        
-        # Send emails
-        result = email_sender.send_bulk_emails(
-            email_list=data['emails'],
-            subject=data['subject'],
-            body_text=data['body'],
-            attachments=data.get('attachments')
-        )
-
+            
+        # Split emails into batches
+        batch_size = 50
+        email_list = data['emails']
+        batches = [email_list[i:i + batch_size] 
+                  for i in range(0, len(email_list), batch_size)]
+                  
+        # Queue jobs for each batch
+        jobs = []
+        for batch in batches:
+            # Choose queue based on user priority or other factors
+            queue = default_queue
+            
+            job = queue.enqueue(
+                'tasks.send_email_batch',
+                args=(
+                    user_id,
+                    batch,
+                    data['subject'],
+                    data['body'],
+                    data.get('attachments')
+                ),
+                job_timeout='1h',
+                result_ttl=86400  # Keep results for 24 hours
+            )
+            jobs.append(job.id)
+            
         return jsonify({
             'status': 'success',
-            'message': result['summary'],
-            'details': {
-                'successful': result['success_count'],
-                'failed': result['failed_count'],
-                'total': result['total'],
-                'results': result['results']
-            }
+            'message': f'Queued {len(email_list)} emails for sending',
+            'job_ids': jobs
         })
-
+        
     except Exception as e:
-        logger.error(f"Error in send_emails: {str(e)}")
+        logger.error(f"Error queuing emails: {e}")
         return jsonify({
             'status': 'error',
-            'message': f'Failed to send emails: {str(e)}'
+            'message': str(e)
+        }), 500
+
+@app.route('/job-status/<job_id>', methods=['GET'])
+@jwt_required()
+def get_job_status(job_id):
+    try:
+        redis_conn = Redis(
+            host=os.getenv('REDIS_HOST', 'localhost'),
+            port=int(os.getenv('REDIS_PORT', 6379))
+        )
+        
+        job = Job.fetch(job_id, connection=redis_conn)
+        
+        status = {
+            'id': job.id,
+            'status': job.get_status(),
+            'progress': job.meta.get('progress', {}),
+            'result': job.result if job.is_finished else None,
+            'error': str(job.exc_info) if job.is_failed else None
+        }
+        
+        return jsonify(status)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
         }), 500
 
 @app.route('/logs', methods=['GET'])
@@ -335,4 +373,5 @@ def after_request(response):
     return response
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)

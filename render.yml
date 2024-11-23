@@ -1,9 +1,15 @@
 services:
   - type: web
-    name: email-sender
+    name: bulk-email-backend
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class gevent -w 1 app:app
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --timeout 300
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9
+        value: 3.11.0
+      - key: MONGODB_URI
+        sync: false  # Add this in Render dashboard
+      - key: JWT_SECRET_KEY
+        sync: false  # Add this in Render dashboard
+      - key: SECRET_KEY
+        sync: false  # Add this in Render dashboard
