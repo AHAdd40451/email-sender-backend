@@ -1,6 +1,6 @@
 
-const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
-
+// const API_BASE_URL = 'https://email-sender-backend-dyxz.onrender.com';
+const API_BASE_URL = 'https://email-sender-backend-production.up.railway.app';
 let currentState;
 
 async function initializeState() {
