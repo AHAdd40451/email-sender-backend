@@ -7,7 +7,7 @@ async function initializeApp() {
     console.log('Initializing app...');
 
     try {
-        // Check authentication
+        // Simple token check
         const token = localStorage.getItem('token');
         if (!token) {
             console.log('No token found, redirecting to login');
@@ -15,14 +15,10 @@ async function initializeApp() {
             return;
         }
 
-        // Setup event listeners first
+        // Continue with app initialization
         setupEventListeners();
-        
-        // Load initial data
         await loadSmtpSettings();
-        
         await loadLogs();
-        
         await loadSavedData();
         
         console.log('App initialized successfully');
@@ -279,12 +275,6 @@ async function loadSmtpSettings() {
         console.log('Response status:', response.status);
         
         if (!response.ok) {
-            if (response.status === 401) {
-                // Handle unauthorized access
-                localStorage.removeItem('token');
-                window.location.href = 'login.html';
-                return;
-            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
