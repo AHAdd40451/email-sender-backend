@@ -1,4 +1,5 @@
-const API_BASE_URL = 'https://email-sender-backend-production.up.railway.app';
+import config from './config.js';
+const { API_BASE_URL } = config;
 const BATCH_SIZE = 25; // Optimal for Railway free tier
 
 let currentState;

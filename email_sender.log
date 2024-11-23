@@ -166,3 +166,5 @@
 2024-11-22 19:30:59,956 - INFO - MX records found for domain gmail.com
 2024-11-22 19:31:02,028 - SUCCESS - [3/3] Successfully sent email to ahadkhan40451@gmail.com
 2024-11-22 19:31:02,235 - INFO - Email sending completed. Success: 3, Failed: 0
+2024-11-23 15:13:07,949 - INFO - Verifying email domain: gmail.com
+2024-11-23 15:13:08,223 - INFO - MX records found for domain gmail.com

@@ -220,13 +220,16 @@ def send_emails():
             attachments=data.get('attachments')
         )
 
+        # Create a summary message
+        summary = f"Sent {result['success_count']} emails successfully, {result['failed_count']} failed"
+
         return jsonify({
             'status': 'success',
-            'message': result['summary'],
+            'message': summary,
             'details': {
                 'successful': result['success_count'],
                 'failed': result['failed_count'],
-                'total': result['total'],
+                'total': len(data['emails']),
                 'results': result['results']
             }
         })
