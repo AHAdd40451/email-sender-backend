@@ -10,8 +10,8 @@ function initializeSocket(userId) {
             transports: ['websocket'],
             upgrade: false,
             reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 3
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
         });
         
         socket.on('connect', () => {

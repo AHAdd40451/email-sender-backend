@@ -29,7 +29,12 @@ CORS(app, resources={
     }
 })
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app,
+    cors_allowed_origins=["http://localhost:3000", "https://your-frontend-domain.com"],
+    async_mode='eventlet',
+    ping_timeout=60,
+    ping_interval=25
+)
 init_socketio(socketio)  # Initialize socketio in logger_utils
 
 jwt = JWTManager(app)
