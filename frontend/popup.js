@@ -16,10 +16,18 @@ function initializeSocket(userId) {
         
         socket.on('connect', () => {
             console.log('Connected to WebSocket');
+            // Join user-specific room when connected
+            socket.emit('join', { userId: userId });
         });
 
-        socket.on(`logs_${userId}`, (logEntry) => {
-            addLogEntryToUI(logEntry);
+        // Listen for real-time logs
+        socket.on('log_update', (logEntry) => {
+            console.log('Received real-time log:', logEntry);
+            addLogEntryToUI(logEntry, true); // true indicates this is a real-time entry
+        });
+
+        socket.on('logs_message', (data) => {
+            console.log('Logs message:', data.message);
         });
 
         socket.on('disconnect', () => {
@@ -35,27 +43,58 @@ function initializeSocket(userId) {
     }
 }
 
-function addLogEntryToUI(logEntry) {
+function addLogEntryToUI(logEntry, isRealtime = false) {
     const logEntries = document.getElementById('log-entries');
     const entry = document.createElement('div');
     entry.className = `log-entry ${logEntry.level}`;
     
+    if (isRealtime) {
+        entry.classList.add('realtime-log');
+        entry.style.animation = 'fadeIn 0.5s ease-in';
+    }
+    
+    // Format the timestamp
     const timestamp = new Date(logEntry.timestamp).toLocaleString();
     
+    // Only show details if they contain information other than user_id
+    const hasRelevantDetails = logEntry.details && 
+        Object.keys(logEntry.details).length > 0 && 
+        !(Object.keys(logEntry.details).length === 1 && logEntry.details.user_id);
+
     entry.innerHTML = `
         <span class="log-timestamp">[${timestamp}]</span>
         <span class="log-level ${logEntry.level}">${logEntry.level.toUpperCase()}</span>
         <span class="log-message">${logEntry.message}</span>
+        ${hasRelevantDetails ? `
+            <span class="log-details">${formatDetails(logEntry.details)}</span>
+        ` : ''}
     `;
     
-    if (logEntry.details) {
-        const detailsSpan = document.createElement('span');
-        detailsSpan.className = 'log-details';
-        detailsSpan.textContent = JSON.stringify(logEntry.details);
-        entry.appendChild(detailsSpan);
-    }
-    
+    // Insert at the top for real-time logs
     logEntries.insertBefore(entry, logEntries.firstChild);
+    
+    // Limit the number of displayed logs
+    const maxDisplayedLogs = 100;
+    while (logEntries.children.length > maxDisplayedLogs) {
+        logEntries.removeChild(logEntries.lastChild);
+    }
+}
+
+// Helper function to format details
+function formatDetails(details) {
+    if (!details) return '';
+    
+    // Filter out user_id and empty objects
+    const relevantDetails = Object.entries(details)
+        .filter(([key, value]) => key !== 'user_id' && value !== undefined && value !== null)
+        .reduce((obj, [key, value]) => {
+            obj[key] = value;
+            return obj;
+        }, {});
+    
+    if (Object.keys(relevantDetails).length === 0) return '';
+    
+    return JSON.stringify(relevantDetails, null, 2);
 }
 
 document.addEventListener('DOMContentLoaded', initializeApp);
@@ -484,7 +523,7 @@ async function loadLogs() {
         }
 
         const logEntries = document.getElementById('log-entries');
-        logEntries.innerHTML = '';
+        logEntries.innerHTML = ''; // Clear existing logs
 
         if (data.logs && Array.isArray(data.logs)) {
             // Sort logs by timestamp in descending order
@@ -492,36 +531,8 @@ async function loadLogs() {
                 new Date(b.timestamp) - new Date(a.timestamp)
             );
 
-            sortedLogs.forEach(log => {
-                const entry = document.createElement('div');
-                entry.className = `log-entry ${log.level}`;
-                
-                // Format timestamp
-                const timestamp = new Date(log.timestamp).toLocaleString();
-                
-                // Create log message with proper formatting
-                entry.innerHTML = `
-                    <span class="log-timestamp">[${timestamp}]</span>
-                    <span class="log-level ${log.level}">${log.level.toUpperCase()}</span>
-                    <span class="log-message">${log.message}</span>
-                `;
-                
-                // Add details if they exist
-                if (log.details) {
-                    const detailsSpan = document.createElement('span');
-                    detailsSpan.className = 'log-details';
-                    detailsSpan.textContent = JSON.stringify(log.details);
-                    entry.appendChild(detailsSpan);
-                }
-                
-                logEntries.appendChild(entry);
-            });
-
-            // Add log count
-            const logCount = document.createElement('div');
-            logCount.className = 'log-count';
-            logCount.textContent = `Showing ${sortedLogs.length} logs`;
-            logEntries.insertBefore(logCount, logEntries.firstChild);
+            // Add each log entry to the UI
+            sortedLogs.forEach(log => addLogEntryToUI(log, false));
         }
 
     } catch (error) {
@@ -724,3 +735,73 @@ function formatFileSize(bytes) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+// Add some CSS for better log visualization
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .log-entry {
+        padding: 8px;
+        margin: 4px 0;
+        border-radius: 4px;
+        border-left: 4px solid #ccc;
+        background-color: #f8f9fa;
+    }
+    
+    .realtime-log {
+        border-left-color: #4CAF50;
+        background-color: #f1f8e9;
+    }
+    
+    .log-timestamp {
+        color: #666;
+        margin-right: 8px;
+        font-family: monospace;
+    }
+    
+    .log-level {
+        font-weight: bold;
+        margin-right: 8px;
+        text-transform: uppercase;
+        font-size: 0.85em;
+        padding: 2px 6px;
+        border-radius: 3px;
+    }
+    
+    .log-level.info { 
+        color: #fff;
+        background-color: #4CAF50; 
+    }
+    .log-level.error { 
+        color: #fff;
+        background-color: #f44336; 
+    }
+    .log-level.warning { 
+        color: #fff;
+        background-color: #ff9800; 
+    }
+    
+    .log-message {
+        color: #333;
+        margin-left: 8px;
+    }
+    
+    .log-details {
+        display: block;
+        margin-top: 4px;
+        margin-left: 8px;
+        color: #666;
+        font-size: 0.9em;
+        font-family: monospace;
+        white-space: pre-wrap;
+        background-color: #fff;
+        padding: 4px 8px;
+        border-radius: 3px;
+        border: 1px solid #eee;
+    }
+`;
+document.head.appendChild(style);

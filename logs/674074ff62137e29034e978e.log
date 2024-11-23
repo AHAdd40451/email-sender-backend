@@ -1,4 +1,4 @@
-{"timestamp": "2024-11-23T11:35:21.357125", "action": "send_emails", "message": "Starting email send to 1 recipients", "level": "info", "details": null}
-{"timestamp": "2024-11-23T11:35:21.459449", "action": "email_sender", "message": "Verifying email domain: gmail.com", "level": "info", "details": null}
-{"timestamp": "2024-11-23T11:35:21.473077", "action": "email_sender", "message": "MX records found for domain gmail.com", "level": "info", "details": null}
-{"timestamp": "2024-11-23T11:35:26.912272", "action": "send_emails", "message": "Email sending completed. Success: 1, Failed: 0", "level": "info", "details": null}
+{"timestamp": "2024-11-23T11:58:45.952664", "action": "send_emails", "message": "Starting email send to 1 recipients", "level": "info", "details": {"user_id": "674074ff62137e29034e978e"}, "user_id": "674074ff62137e29034e978e"}
+{"timestamp": "2024-11-23T11:58:48.041973", "action": "email_sender", "message": "Verifying email domain: gmail.com", "level": "info", "details": {}, "user_id": "674074ff62137e29034e978e"}
+{"timestamp": "2024-11-23T11:58:48.480051", "action": "email_sender", "message": "MX records found for domain gmail.com", "level": "info", "details": {}, "user_id": "674074ff62137e29034e978e"}
+{"timestamp": "2024-11-23T11:59:10.743040", "action": "send_emails", "message": "Email sending completed. Success: 1, Failed: 0", "level": "info", "details": {"user_id": "674074ff62137e29034e978e"}, "user_id": "674074ff62137e29034e978e"}

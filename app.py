@@ -2,14 +2,10 @@ from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
 from models import User, SmtpSettings, JSONEncoder
+from email_utils import EmailSender
+from logger_utils import save_log, get_user_logs, clear_user_logs, init_socketio
 import logging
 import os
-import json
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from bson import ObjectId
-from email_utils import EmailSender
 from datetime import datetime
 from flask_socketio import SocketIO, emit, join_room
 
@@ -17,74 +13,13 @@ from flask_socketio import SocketIO, emit, join_room
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create logs directory
-LOG_DIR = "logs"
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
-
-def save_log(user_id, action, message, level='info', details=None):
-    """Save log to user-specific file and emit via socket"""
-    try:
-        timestamp = datetime.utcnow().isoformat()
-        log_entry = {
-            'timestamp': timestamp,
-            'action': action,
-            'message': message,
-            'level': level,
-            'details': details
-        }
-        
-        # Save to file
-        log_file = os.path.join(LOG_DIR, f"{user_id}.log")
-        with open(log_file, 'a') as f:
-            f.write(json.dumps(log_entry) + '\n')
-            
-        # Emit via socket
-        socketio.emit(f'logs_{user_id}', log_entry, room=f'user_{user_id}')
-        
-        logger.info(f"[{user_id}] {level.upper()}: {message}")
-        
-    except Exception as e:
-        logger.error(f"Error saving log: {e}")
-
-def get_user_logs(user_id, limit=100):
-    """Retrieve logs for specific user"""
-    try:
-        log_file = os.path.join(LOG_DIR, f"{user_id}.log")
-        logs = []
-        
-        if os.path.exists(log_file):
-            with open(log_file, 'r') as f:
-                logs = [json.loads(line) for line in f.readlines()]
-            
-            # Return only the latest logs based on limit
-            logs = sorted(logs, key=lambda x: x['timestamp'], reverse=True)[:limit]
-            
-        return logs
-        
-    except Exception as e:
-        logger.error(f"Error reading logs: {e}")
-        return []
-
-def clear_user_logs(user_id):
-    """Clear logs for specific user"""
-    try:
-        log_file = os.path.join(LOG_DIR, f"{user_id}.log")
-        if os.path.exists(log_file):
-            os.remove(log_file)
-            return True
-        return False
-    except Exception as e:
-        logger.error(f"Error clearing logs: {e}")
-        return False
-
 # Flask app setup
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 app.json_encoder = JSONEncoder
 
-# Setup CORS
+# Setup CORS and Socket.IO
 CORS(app, resources={
     r"/*": {
         "origins": "*",
@@ -94,17 +29,25 @@ CORS(app, resources={
     }
 })
 
-jwt = JWTManager(app)
-
-# Add Socket.IO
 socketio = SocketIO(app, cors_allowed_origins="*")
+init_socketio(socketio)  # Initialize socketio in logger_utils
+
+jwt = JWTManager(app)
 
 @socketio.on('join')
 def on_join(data):
     user_id = data.get('userId')
     if user_id:
-        join_room(f'user_{user_id}')
-        emit('logs_message', {'message': 'Connected to log stream'}, room=f'user_{user_id}')
+        room = f'user_{user_id}'
+        join_room(room)
+        # Send initial connection message
+        emit('log_update', {
+            'timestamp': datetime.utcnow().isoformat(),
+            'action': 'connection',
+            'message': 'Connected to log stream',
+            'level': 'info',
+            'user_id': user_id
+        }, room=room)
 
 @app.route('/smtp-settings', methods=['GET'])
 @jwt_required()
@@ -221,7 +164,12 @@ def send_emails():
         user_id = get_jwt_identity()
         data = request.json
         
-        save_log(user_id, 'send_emails', f"Starting email send to {len(data['emails'])} recipients")
+        save_log(
+            user_id=user_id,
+            action='send_emails',
+            message=f"Starting email send to {len(data['emails'])} recipients",
+            details={'user_id': user_id}
+        )
         
         # Validate input
         if not data.get('emails') or not data.get('subject') or not data.get('body'):
@@ -252,7 +200,12 @@ def send_emails():
         # Create a summary message
         summary = f"Sent {result['success_count']} emails successfully, {result['failed_count']} failed"
 
-        save_log(user_id, 'send_emails', f"Email sending completed. Success: {result['success_count']}, Failed: {result['failed_count']}")
+        save_log(
+            user_id=user_id,
+            action='send_emails',
+            message=f"Email sending completed. Success: {result['success_count']}, Failed: {result['failed_count']}",
+            details={'user_id': user_id}
+        )
         
         return jsonify({
             'status': 'success',
@@ -266,7 +219,13 @@ def send_emails():
         })
 
     except Exception as e:
-        save_log(user_id, 'send_emails', f"Error sending emails: {str(e)}", 'error')
+        save_log(
+            user_id=user_id,
+            action='send_emails',
+            message=f"Error sending emails: {str(e)}",
+            level='error',
+            details={'user_id': user_id}
+        )
         return jsonify({
             'status': 'error',
             'message': f'Failed to send emails: {str(e)}'
@@ -279,19 +238,18 @@ def get_logs():
         user_id = get_jwt_identity()
         limit = request.args.get('limit', 100, type=int)
         
-        log_file = os.path.join(LOG_DIR, f"{user_id}.log")
-        logs = []
+        # Get logs specific to this user
+        logs = get_user_logs(user_id, limit)
         
-        if os.path.exists(log_file):
-            with open(log_file, 'r') as f:
-                logs = [json.loads(line) for line in f.readlines()]
-            
-            # Return only the latest logs based on limit
-            logs = sorted(logs, key=lambda x: x['timestamp'], reverse=True)[:limit]
+        # Filter logs to ensure only user's own logs are returned
+        filtered_logs = [
+            log for log in logs 
+            if log.get('user_id') == user_id
+        ]
         
         return jsonify({
             'status': 'success',
-            'logs': logs
+            'logs': filtered_logs
         })
 
     except Exception as e:
@@ -306,14 +264,11 @@ def get_logs():
 def clear_logs():
     try:
         user_id = get_jwt_identity()
-        log_file = os.path.join(LOG_DIR, f"{user_id}.log")
-        
-        if os.path.exists(log_file):
-            os.remove(log_file)
+        success = clear_user_logs(user_id)
         
         return jsonify({
-            'status': 'success',
-            'message': 'Logs cleared successfully'
+            'status': 'success' if success else 'error',
+            'message': 'Logs cleared successfully' if success else 'Failed to clear logs'
         })
 
     except Exception as e:
