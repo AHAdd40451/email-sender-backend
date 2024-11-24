@@ -149,23 +149,85 @@ input, select {
 }
 
 .log-entries {
-    max-height: 200px;
+    max-height: 300px;
     overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 4px;
+    background: #f8f9fa;
     font-family: monospace;
     font-size: 12px;
-    background: #f5f5f5;
-    padding: 10px;
 }
 
 .log-entry {
-    padding: 4px 0;
-    border-bottom: 1px solid #eee;
+    margin: 5px 0;
+    padding: 5px;
+    border-radius: 3px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: baseline;
 }
 
-.log-entry.success { color: #4CAF50; }
-.log-entry.error { color: #f44336; }
-.log-entry.warning { color: #ff9800; }
-.log-entry.info { color: #2196F3; }
+.log-timestamp {
+    color: #666;
+    white-space: nowrap;
+}
+
+.log-level {
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.log-level.success { background: #d4edda; color: #155724; }
+.log-level.error { background: #f8d7da; color: #721c24; }
+.log-level.info { background: #d1ecf1; color: #0c5460; }
+.log-level.warning { background: #fff3cd; color: #856404; }
+
+.log-message {
+    flex: 1;
+    word-break: break-word;
+}
+
+.log-details {
+    width: 100%;
+    font-size: 11px;
+    color: #666;
+    padding-left: 20px;
+    margin-top: 2px;
+}
+
+.log-count {
+    color: #666;
+    font-size: 11px;
+    margin-bottom: 10px;
+    padding: 5px;
+    background: #eee;
+    border-radius: 3px;
+    text-align: center;
+}
+
+.logs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#clear-logs-btn {
+    padding: 5px 10px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+#clear-logs-btn:hover {
+    background: #c82333;
+}
 
 .full-width {
     width: 100%;
@@ -191,4 +253,233 @@ input, select {
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
+}
+
+.auth-form {
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.auth-form input {
+    width: 100%;
+    padding: 8px;
+    margin: 8px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.auth-form button {
+    width: 100%;
+    padding: 10px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.auth-form button:hover {
+    background: #0056b3;
+}
+
+.hidden {
+    display: none;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.logout-btn {
+    padding: 8px 16px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.logout-btn:hover {
+    background: #c82333;
+}
+
+/* Button Styles */
+.primary-btn, .secondary-btn, .danger-btn, .send-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.primary-btn {
+    background-color: #007bff;
+    color: white;
+}
+
+.primary-btn:hover {
+    background-color: #0056b3;
+}
+
+.secondary-btn {
+    background-color: #6c757d;
+    color: white;
+}
+
+.secondary-btn:hover {
+    background-color: #5a6268;
+}
+
+.danger-btn {
+    background-color: #dc3545;
+    color: white;
+}
+
+.danger-btn:hover {
+    background-color: #c82333;
+}
+
+.send-btn {
+    background-color: #28a745;
+    color: white;
+    width: 100%;
+    padding: 12px;
+    margin: 20px 0;
+    font-size: 1.1em;
+}
+
+.send-btn:hover {
+    background-color: #218838;
+}
+
+/* Container Styles */
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Form Styles */
+textarea {
+    min-height: 200px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+#email-body {
+    min-height: 300px;
+}
+
+#email-list {
+    height: 250px;
+    width: 100%;
+    margin: 10px 0;
+}
+
+.email-input-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+/* Log Styles */
+.logs-container {
+    margin-top: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.log-entries {
+    height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+.log-entry {
+    padding: 5px;
+    margin: 2px 0;
+    border-radius: 3px;
+}
+
+.log-entry.success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.log-entry.error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.log-entry.warning {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.logs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.log-entries {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.log-entry {
+    margin: 5px 0;
+    padding: 5px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.log-entry.success { color: #28a745; }
+.log-entry.error { color: #dc3545; }
+.log-entry.info { color: #17a2b8; }
+.log-entry.warning { color: #ffc107; }
+
+.attachment-list {
+    margin-top: 10px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    min-height: 30px;
+}
+
+.attachment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+    margin: 2px 0;
+    background: #f5f5f5;
+    border-radius: 3px;
+}
+
+.attachment-item button {
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 6px;
+    cursor: pointer;
 }

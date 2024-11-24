@@ -10,10 +10,20 @@
     "webRequest"
   ],
   "host_permissions": [
-    "https://email-sender-backend-dyxz.onrender.com/*"
+    "https://email-sender-backend-production.up.railway.app/*",
+    "http://localhost:5000/*"
   ],
 
   "action": {
     "default_popup": "popup.html"
-  }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "web_accessible_resources": [{
+    "resources": ["socket.io-client.js"],
+    "matches": ["<all_urls>"]
+  }]
 }
+
+

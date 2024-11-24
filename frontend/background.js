@@ -1,3 +1,7 @@
+import config from './config.js';
+const { API_BASE_URL } = config;
+const BATCH_SIZE = 25; // Optimal for Railway free tier
+
 let currentState;
 
 async function initializeState() {
@@ -65,22 +69,34 @@ async function handleSendEmails(request, sendResponse) {
     currentState.stats.totalRecipients = request.data.recipients.length;
     await saveState();
 
-    for (const recipient of request.data.recipients) {
+    // Create batches
+    const batches = [];
+    for (let i = 0; i < request.data.recipients.length; i += BATCH_SIZE) {
+      batches.push(request.data.recipients.slice(i, i + BATCH_SIZE));
+    }
+
+    // Single WebSocket connection for all batches
+    const socket = io(`${API_BASE_URL}`, {
+      transports: ['websocket'],
+      upgrade: false,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 3
+    });
+
+    for (const batch of batches) {
       if (!currentState.isRunning) break;
-      
+
       try {
-        await sendEmail(recipient, request.data);
+        await sendEmailBatch(socket, batch, request.data);
+        // Add delay between batches
+        await new Promise(resolve => setTimeout(resolve, 2000));
       } catch (error) {
-        currentState.stats.emailsFailed++;
-        currentState.failedEmails.push({
-          email: recipient,
-          error: error.message,
-          timestamp: new Date().toISOString()
-        });
-        addLog(`Failed to send to ${recipient}: ${error.message}`, 'error');
+        console.error('Batch error:', error);
       }
     }
 
+    socket.disconnect();
     currentState.isRunning = false;
     await saveState();
     sendResponse({ success: true });
@@ -91,33 +107,36 @@ async function handleSendEmails(request, sendResponse) {
   }
 }
 
-async function sendEmail(recipient, data) {
-  const socket = io('http://localhost:5000', {
-    transports: ['websocket'],
-    upgrade: false
-  });
-
+async function sendEmailBatch(socket, recipients, data) {
   return new Promise((resolve, reject) => {
-    socket.emit('send_email', {
-      recipient,
+    socket.emit('send_email_batch', {
+      recipients,
       senderName: data.senderName || 'Default Sender',
+      subject: data.subject,
+      body: data.body,
+      attachments: data.attachments || [],
       ...data
     });
 
-    socket.on('email_result', (result) => {
+    socket.on('batch_result', (result) => {
       if (result.status === 'success') {
-        currentState.stats.emailsSent++;
-        currentState.sentEmails.push(recipient);
+        result.successful.forEach(email => {
+          currentState.stats.emailsSent++;
+          currentState.sentEmails.push(email);
+        });
+        result.failed.forEach(failure => {
+          currentState.stats.emailsFailed++;
+          currentState.failedEmails.push({
+            email: failure.email,
+            error: failure.error,
+            timestamp: new Date().toISOString()
+          });
+          addLog(`Failed to send to ${failure.email}: ${failure.error}`, 'error');
+        });
         resolve();
       } else {
-        reject(new Error(result.message || 'Failed to send email'));
+        reject(new Error(result.message || 'Batch failed'));
       }
-      socket.disconnect();
-    });
-
-    socket.on('connect_error', (error) => {
-      reject(new Error('Failed to connect to server'));
-      socket.disconnect();
     });
   });
 }
