@@ -295,3 +295,45 @@ class EmailTemplate:
             'subject': self.subject,
             'body': self.body
         }
+
+class EmailList:
+    collection = db['email_lists']
+
+    def __init__(self, user_id, emails):
+        self.user_id = ObjectId(user_id) if isinstance(user_id, str) else user_id
+        self.emails = emails
+
+    @classmethod
+    def get_by_user_id(cls, user_id):
+        try:
+            user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
+            result = cls.collection.find_one({'user_id': user_id_obj})
+            if result:
+                return cls(user_id=result['user_id'], emails=result['emails'])
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving email list: {e}")
+            raise
+
+    def save(self):
+        try:
+            data = {
+                'user_id': self.user_id,
+                'emails': self.emails,
+                'updated_at': datetime.utcnow()
+            }
+            
+            result = self.collection.update_one(
+                {'user_id': self.user_id},
+                {'$set': data},
+                upsert=True
+            )
+            return self
+        except Exception as e:
+            logger.error(f"Error saving email list: {e}")
+            raise
+
+    def to_dict(self):
+        return {
+            'emails': self.emails
+        }

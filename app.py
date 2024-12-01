@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
-from models import User, SmtpSettings, JSONEncoder
+from models import User, SmtpSettings, JSONEncoder, EmailList
 import logging
 import os
 import json
@@ -11,7 +11,6 @@ from email.mime.multipart import MIMEMultipart
 from bson import ObjectId
 from email_utils import EmailSender
 from datetime import datetime
-from flask_socketio import SocketIO, emit, join_room
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +22,7 @@ if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
 def save_log(user_id, action, message, level='info', details=None):
-    """Save log to user-specific file and emit via socket"""
+    """Save log to user-specific file"""
     try:
         timestamp = datetime.utcnow().isoformat()
         log_entry = {
@@ -39,9 +38,6 @@ def save_log(user_id, action, message, level='info', details=None):
         with open(log_file, 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
             
-        # Emit via socket
-        socketio.emit(f'logs_{user_id}', log_entry, room=f'user_{user_id}')
-        
         logger.info(f"[{user_id}] {level.upper()}: {message}")
         
     except Exception as e:
@@ -95,16 +91,6 @@ CORS(app, resources={
 })
 
 jwt = JWTManager(app)
-
-# Add Socket.IO
-socketio = SocketIO(app, cors_allowed_origins="*")
-
-@socketio.on('join')
-def on_join(data):
-    user_id = data.get('userId')
-    if user_id:
-        join_room(f'user_{user_id}')
-        emit('logs_message', {'message': 'Connected to log stream'}, room=f'user_{user_id}')
 
 @app.route('/smtp-settings', methods=['GET'])
 @jwt_required()
@@ -355,6 +341,53 @@ def register():
             'message': 'An error occurred during registration'
         }), 500
 
+@app.route('/email-list', methods=['GET'])
+@jwt_required()
+def get_email_list():
+    try:
+        user_id = get_jwt_identity()
+        email_list = EmailList.get_by_user_id(user_id)
+        
+        return jsonify({
+            'status': 'success',
+            'emails': email_list.to_dict()['emails'] if email_list else []
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching email list: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/email-list', methods=['POST'])
+@jwt_required()
+def save_email_list():
+    try:
+        user_id = get_jwt_identity()
+        data = request.json
+        
+        if not isinstance(data.get('emails'), list):
+            return jsonify({
+                'status': 'error',
+                'message': 'Emails must be provided as a list'
+            }), 400
+
+        email_list = EmailList(user_id=user_id, emails=data['emails'])
+        email_list.save()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Email list saved successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error saving email list: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 # Add error handlers
 @app.errorhandler(404)
 def not_found(e):
@@ -378,4 +411,9 @@ def after_request(response):
     return response
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5000)
+    logger.info("Starting server on port 5000")
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=True
+    )

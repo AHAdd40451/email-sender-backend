@@ -1,65 +1,6 @@
 import config from './config.js';
 const { API_BASE_URL } = config;
 
-// Add this after your other imports
-let socket;
-
-function initializeSocket(userId) {
-    try {
-        socket = io(API_BASE_URL, {
-            transports: ['websocket'],
-            upgrade: false,
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 3
-        });
-        
-        socket.on('connect', () => {
-            console.log('Connected to WebSocket');
-        });
-
-        socket.on(`logs_${userId}`, (logEntry) => {
-            addLogEntryToUI(logEntry);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('Disconnected from WebSocket');
-        });
-
-        socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-        });
-
-    } catch (error) {
-        console.error('Socket initialization error:', error);
-    }
-}
-
-function addLogEntryToUI(logEntry) {
-    const logEntries = document.getElementById('log-entries');
-    const entry = document.createElement('div');
-    entry.className = `log-entry ${logEntry.level}`;
-    
-    const timestamp = new Date(logEntry.timestamp).toLocaleString();
-    
-    entry.innerHTML = `
-        <span class="log-timestamp">[${timestamp}]</span>
-        <span class="log-level ${logEntry.level}">${logEntry.level.toUpperCase()}</span>
-        <span class="log-message">${logEntry.message}</span>
-    `;
-    
-    if (logEntry.details) {
-        const detailsSpan = document.createElement('span');
-        detailsSpan.className = 'log-details';
-        detailsSpan.textContent = JSON.stringify(logEntry.details);
-        entry.appendChild(detailsSpan);
-    }
-    
-    logEntries.insertBefore(entry, logEntries.firstChild);
-}
-
-document.addEventListener('DOMContentLoaded', initializeApp);
-
 async function initializeApp() {
     console.log('Initializing app...');
 
@@ -71,24 +12,49 @@ async function initializeApp() {
             return;
         }
 
-        // Get user ID from JWT token
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const userId = payload.sub; // or however you store the user ID in the token
-
-        // Initialize WebSocket connection
-        initializeSocket(userId);
-
         // Continue with other initialization
         setupEventListeners();
         await loadSmtpSettings();
         await loadLogs();
-        await loadSavedData();
-        
+        await loadEmailList();
+
         console.log('App initialized successfully');
     } catch (error) {
         console.error('Error initializing app:', error);
+        addLogEntryToUI({
+            level: 'error',
+            message: `Initialization error: ${error.message}`,
+            timestamp: new Date().toISOString()
+        });
     }
 }
+
+function addLogEntryToUI(logEntry) {
+    const logEntries = document.getElementById('log-entries');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${logEntry.level}`;
+
+    const timestamp = new Date(logEntry.timestamp).toLocaleString();
+
+    entry.innerHTML = `
+        <span class="log-timestamp">[${timestamp}]</span>
+        <span class="log-level ${logEntry.level}">${logEntry.level.toUpperCase()}</span>
+        <span class="log-message">${logEntry.message}</span>
+    `;
+
+    if (logEntry.details) {
+        const detailsSpan = document.createElement('span');
+        detailsSpan.className = 'log-details';
+        detailsSpan.textContent = JSON.stringify(logEntry.details);
+        entry.appendChild(detailsSpan);
+    }
+
+    logEntries.insertBefore(entry, logEntries.firstChild);
+}
+
+document.addEventListener('DOMContentLoaded', initializeApp);
+
+
 
 function setupEventListeners() {
     // Tab Switching
@@ -148,15 +114,15 @@ function setupEventListeners() {
     // Auto-save email template
     const emailSubject = document.getElementById('email-subject');
     const emailBody = document.getElementById('email-body');
-    
+
     if (emailSubject) {
         emailSubject.addEventListener('input', debounce(saveEmailTemplate, 1000));
     }
-    
+
     if (emailBody) {
         emailBody.addEventListener('input', debounce(saveEmailTemplate, 1000));
     }
-    
+
     // Auto-save email list
     const emailList = document.getElementById('email-list');
     if (emailList) {
@@ -186,17 +152,17 @@ function setupEventListeners() {
         });
     }
 
-    document.getElementById('attachments').addEventListener('change', function(e) {
+    document.getElementById('attachments').addEventListener('change', function (e) {
         const attachmentList = document.getElementById('attachment-list');
         attachmentList.innerHTML = '';
-        
+
         for (const file of this.files) {
             const item = document.createElement('div');
             item.className = 'attachment-item';
-            
+
             const name = document.createElement('span');
             name.textContent = `${file.name} (${formatFileSize(file.size)})`;
-            
+
             const removeBtn = document.createElement('button');
             removeBtn.textContent = '';
             removeBtn.onclick = () => {
@@ -209,23 +175,13 @@ function setupEventListeners() {
                 this.files = dt.files;
                 item.remove();
             };
-            
+
             item.appendChild(name);
             item.appendChild(removeBtn);
             attachmentList.appendChild(item);
         }
     });
 
-    document.getElementById('attachments').addEventListener('change', async function(e) {
-        const attachmentList = document.getElementById('attachment-list');
-        attachmentList.innerHTML = '';
-        
-        // Save the template with new attachments
-        await saveEmailTemplate();
-        
-        // Reload the attachment list
-        await loadSavedData();
-    });
 
     // Clear Emails Button
     const clearEmailsBtn = document.getElementById('clear-emails-btn');
@@ -250,14 +206,10 @@ function switchTab(tabId) {
     });
 }
 
-async function loadInitialData() {
-    await loadSmtpSettings();
-}
-
 function addEmail() {
     const emailInput = document.getElementById('new-email');
     const emailList = document.getElementById('email-list');
-    
+
     const email = emailInput.value.trim();
     if (isValidEmail(email)) {
         const emails = new Set(emailList.value.split('\n').filter(e => e.trim()));
@@ -310,7 +262,7 @@ async function loadSmtpSettings() {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -370,7 +322,7 @@ async function sendEmails() {
         // Handle attachments
         const attachmentInput = document.getElementById('attachments');
         const attachments = [];
-        
+
         for (const file of attachmentInput.files) {
             const reader = new FileReader();
             const attachment = await new Promise((resolve, reject) => {
@@ -478,7 +430,7 @@ async function loadLogs() {
         }
 
         const data = await response.json();
-        
+
         if (data.status === 'error') {
             throw new Error(data.message);
         }
@@ -488,24 +440,24 @@ async function loadLogs() {
 
         if (data.logs && Array.isArray(data.logs)) {
             // Sort logs by timestamp in descending order
-            const sortedLogs = data.logs.sort((a, b) => 
+            const sortedLogs = data.logs.sort((a, b) =>
                 new Date(b.timestamp) - new Date(a.timestamp)
             );
 
             sortedLogs.forEach(log => {
                 const entry = document.createElement('div');
                 entry.className = `log-entry ${log.level}`;
-                
+
                 // Format timestamp
                 const timestamp = new Date(log.timestamp).toLocaleString();
-                
+
                 // Create log message with proper formatting
                 entry.innerHTML = `
                     <span class="log-timestamp">[${timestamp}]</span>
                     <span class="log-level ${log.level}">${log.level.toUpperCase()}</span>
                     <span class="log-message">${log.message}</span>
                 `;
-                
+
                 // Add details if they exist
                 if (log.details) {
                     const detailsSpan = document.createElement('span');
@@ -513,7 +465,7 @@ async function loadLogs() {
                     detailsSpan.textContent = JSON.stringify(log.details);
                     entry.appendChild(detailsSpan);
                 }
-                
+
                 logEntries.appendChild(entry);
             });
 
@@ -549,53 +501,54 @@ async function clearLogs() {
     }
 }
 
-async function loadSavedData() {
+async function loadEmailList() {
     try {
-        const result = await chrome.storage.local.get(['emailTemplate', 'emailList']);
-        
-        // Load email template
-        if (result.emailTemplate) {
-            document.getElementById('email-subject').value = result.emailTemplate.subject || '';
-            document.getElementById('email-body').value = result.emailTemplate.body || '';
-            
-            // Load attachments
-            if (result.emailTemplate.attachments) {
-                const attachmentList = document.getElementById('attachment-list');
-                attachmentList.innerHTML = '';
-                
-                result.emailTemplate.attachments.forEach(attachment => {
-                    const item = document.createElement('div');
-                    item.className = 'attachment-item';
-                    
-                    const name = document.createElement('span');
-                    name.textContent = `${attachment.filename} (${formatFileSize(attachment.size)})`;
-                    
-                    const removeBtn = document.createElement('button');
-                    removeBtn.textContent = '×';
-                    removeBtn.onclick = async () => {
-                        item.remove();
-                        // Remove attachment from storage
-                        const template = result.emailTemplate;
-                        template.attachments = template.attachments.filter(
-                            a => a.filename !== attachment.filename
-                        );
-                        await chrome.storage.local.set({ emailTemplate: template });
-                    };
-                    
-                    item.appendChild(name);
-                    item.appendChild(removeBtn);
-                    attachmentList.appendChild(item);
-                });
+        const response = await fetch(`${API_BASE_URL}/email-list`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
-        // Load email list
-        if (result.emailList) {
-            document.getElementById('email-list').value = result.emailList.join('\n');
+
+        const data = await response.json();
+        if (data.status === 'success') {
+            const emailList = document.getElementById('email-list');
+            emailList.value = data.emails.join('\n');
         }
-        
     } catch (error) {
-        console.error('Error loading saved data:', error);
+        console.error('Error loading email list:', error);
+    }
+}
+
+async function saveEmailList() {
+    try {
+        const emailListText = document.getElementById('email-list').value;
+        const emails = emailListText.split('\n').filter(email => email.trim());
+
+        const response = await fetch(`${API_BASE_URL}/email-list`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                emails: emails
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Also save to local storage as backup
+        await chrome.storage.local.set({ emailList: emails });
+    } catch (error) {
+        console.error('Error saving email list:', error);
     }
 }
 
@@ -606,7 +559,7 @@ async function saveEmailTemplate() {
         const body = document.getElementById('email-body').value;
         const attachmentInput = document.getElementById('attachments');
         const attachments = [];
-        
+
         for (const file of attachmentInput.files) {
             const reader = new FileReader();
             const attachment = await new Promise((resolve, reject) => {
@@ -623,7 +576,7 @@ async function saveEmailTemplate() {
             });
             attachments.push(attachment);
         }
-        
+
         await chrome.storage.local.set({
             emailTemplate: {
                 subject: subject,
@@ -633,20 +586,6 @@ async function saveEmailTemplate() {
         });
     } catch (error) {
         console.error('Error saving template:', error);
-    }
-}
-
-// Function to save email list
-async function saveEmailList() {
-    try {
-        const emailListText = document.getElementById('email-list').value;
-        const emailList = emailListText.split('\n').filter(email => email.trim());
-        
-        await chrome.storage.local.set({
-            emailList: emailList
-        });
-    } catch (error) {
-        console.error('Error saving email list:', error);
     }
 }
 
@@ -667,7 +606,7 @@ function debounce(func, wait) {
 async function handleCsvImport(file) {
     try {
         const reader = new FileReader();
-        
+
         reader.onload = async (event) => {
             const csvContent = event.target.result;
             const lines = csvContent.split(/\r\n|\n/);
@@ -678,7 +617,10 @@ async function handleCsvImport(file) {
             let duplicateCount = 0;
 
             for (let line of lines) {
-                const email = line.trim();
+                // Split by comma and take only the first column
+                const columns = line.split(',');
+                const email = columns[0]?.trim(); // Get first column and trim whitespace
+
                 if (email && isValidEmail(email)) {
                     if (!currentEmails.has(email)) {
                         currentEmails.add(email);
@@ -692,7 +634,7 @@ async function handleCsvImport(file) {
             }
 
             emailList.value = Array.from(currentEmails).join('\n');
-            
+
             // Save the updated email list
             await saveEmailList();
 

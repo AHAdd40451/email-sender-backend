@@ -64,16 +64,18 @@
         </div>
 
         <!-- Logs Section -->
-        <div class="logs-container">
+        <div class="logs-section">
             <div class="logs-header">
                 <h3>Logs</h3>
-                <button id="clear-logs-btn">Clear Logs</button>
+                <span id="log-count">Showing 0 logs</span>
+                <button id="clear-logs-btn" class="danger-btn">Clear Logs</button>
             </div>
-            <div id="log-entries" class="log-entries"></div>
+            <div id="log-entries" class="logs-container">
+                <!-- Logs will be inserted here -->
+            </div>
         </div>
     </div>
 
-    <script src="socket.io.min.js"></script>
     <script type="module" src="popup.js"></script>
 </body>
 </html>
