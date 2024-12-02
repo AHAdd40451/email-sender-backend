@@ -105,13 +105,15 @@ class EmailSender:
         success_count = 0
         failed_count = 0
         errors = []
+        email_statuses = []  # Track status of each email
 
         try:
             with smtplib.SMTP(self.settings.smtp_server, self.settings.smtp_port) as server:
                 server.starttls()
                 server.login(self.settings.username, self.settings.password)
 
-                for email in email_list:
+                total_emails = len(email_list)
+                for index, email in enumerate(email_list, 1):
                     try:
                         msg = MIMEMultipart()
                         msg['From'] = f"{self.settings.sender_name} <{self.settings.username}>"
@@ -135,21 +137,69 @@ class EmailSender:
 
                         server.send_message(msg)
                         success_count += 1
-                        time.sleep(self.settings.delay)
+                        status = 'success'
+                        error_msg = None
 
                     except Exception as e:
                         failed_count += 1
+                        status = 'failed'
+                        error_msg = str(e)
                         errors.append(f"Failed to send to {email}: {str(e)}")
                         logger.error(f"Error sending to {email}: {e}")
 
+                    # Log individual email status
+                    email_statuses.append({
+                        'email': email,
+                        'status': status,
+                        'error': error_msg,
+                        'timestamp': datetime.utcnow().isoformat()
+                    })
+
+                    # Log progress every 10 emails or at specific percentages
+                    if index % 10 == 0 or index in [1, total_emails] or (index / total_emails) in [0.25, 0.5, 0.75]:
+                        progress_msg = (
+                            f"Progress: {index}/{total_emails} emails processed. "
+                            f"Success: {success_count}, Failed: {failed_count}"
+                        )
+                        self.log_message(progress_msg, 'info')
+
+                    time.sleep(self.settings.delay)
+
+            # Generate final summary
+            summary = {
+                'total_sent': total_emails,
+                'success_count': success_count,
+                'failed_count': failed_count,
+                'success_rate': f"{(success_count/total_emails)*100:.1f}%",
+                'failed_emails': [status['email'] for status in email_statuses if status['status'] == 'failed'],
+                'successful_emails': [status['email'] for status in email_statuses if status['status'] == 'success']
+            }
+
+            # Log final summary
+            self.log_message(
+                f"Email sending completed. Success: {success_count}, Failed: {failed_count}",
+                'info',
+                details={
+                    'summary': summary,
+                    'failed_details': [
+                        {'email': status['email'], 'error': status['error']}
+                        for status in email_statuses
+                        if status['status'] == 'failed'
+                    ]
+                }
+            )
+
         except Exception as e:
             logger.error(f"SMTP connection error: {e}")
+            self.log_message(f"SMTP connection error: {e}", 'error')
             raise
 
         return {
             'success_count': success_count,
             'failed_count': failed_count,
-            'errors': errors
+            'errors': errors,
+            'summary': summary,
+            'email_statuses': email_statuses
         }
 
     def _process_batch(self, batch, batch_num, total_batches, subject, body_text, attachments, max_retries):
