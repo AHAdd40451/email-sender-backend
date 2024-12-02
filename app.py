@@ -442,9 +442,13 @@ def save_email_template():
                 'message': 'Subject and body are required'
             }), 400
 
+        # First delete any existing templates for this user
+        EmailTemplate.delete_by_user_id(user_id)
+        
+        # Then create the new template
         template = EmailTemplate.create(
             user_id=user_id,
-            name='default',  # Using default as the template name
+            name='default',
             subject=data['subject'],
             body=data['body']
         )

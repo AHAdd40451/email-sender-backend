@@ -245,6 +245,12 @@ class EmailTemplate:
         self.attachments = attachments or []
 
     @classmethod
+    def delete_by_user_id(cls, user_id):
+        """Delete all templates for a given user"""
+        user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
+        cls.collection.delete_many({'user_id': user_id_obj})
+
+    @classmethod
     def create(cls, user_id, name, subject, body, attachments=None):
         user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
         template_data = {
@@ -256,7 +262,13 @@ class EmailTemplate:
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow()
         }
-        cls.collection.insert_one(template_data)
+        
+        # Use update_one with upsert instead of insert_one
+        cls.collection.update_one(
+            {'user_id': user_id_obj, 'name': name},
+            {'$set': template_data},
+            upsert=True
+        )
 
         return cls(user_id=user_id_obj, name=name, subject=subject, body=body, attachments=attachments)
 
