@@ -20,7 +20,6 @@ async function initializeApp() {
         await loadSmtpSettings();
         await loadLogs();
         await loadEmailList();
-        await loadEmailTemplate();
 
         console.log('App initialized successfully');
     } catch (error) {
@@ -63,9 +62,14 @@ document.addEventListener('DOMContentLoaded', initializeApp);
 function setupEventListeners() {
     // Tab Switching
     document.querySelectorAll('.tab-btn').forEach(button => {
-        button.addEventListener('click', () => {
+        button.addEventListener('click', async () => {
             const tabId = button.getAttribute('data-tab');
             switchTab(tabId);
+            
+            // Add this condition to reload logs when logs tab is clicked
+            if (tabId === 'logs') {
+                await loadLogs();
+            }
         });
     });
 
@@ -739,42 +743,4 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-async function loadEmailTemplate() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/email-template`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.status === 'success' && data.template) {
-            document.getElementById('email-subject').value = data.template.subject || '';
-            document.getElementById('email-body').value = data.template.body || '';
-        }
-
-        // Also load from local storage as backup
-        const local = await chrome.storage.local.get(['emailTemplate']);
-        if (local.emailTemplate && (!data.template)) {
-            document.getElementById('email-subject').value = local.emailTemplate.subject || '';
-            document.getElementById('email-body').value = local.emailTemplate.body || '';
-        }
-    } catch (error) {
-        console.error('Error loading email template:', error);
-        // Fallback to local storage
-        const local = await chrome.storage.local.get(['emailTemplate']);
-        if (local.emailTemplate) {
-            document.getElementById('email-subject').value = local.emailTemplate.subject || '';
-            document.getElementById('email-body').value = local.emailTemplate.body || '';
-        }
-    }
 }
