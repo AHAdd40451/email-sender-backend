@@ -3,6 +3,7 @@
 <head>
     <title>Bulk Email Sender</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="socket.io.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -12,66 +13,71 @@
         </div>
 
         <div class="tabs">
-            <button class="tab-btn active" data-tab="settings">Settings</button>
+            <button class="tab-btn active" data-tab="settings">SMTP Settings</button>
             <button class="tab-btn" data-tab="emails">Email List</button>
             <button class="tab-btn" data-tab="template">Template</button>
+            <button class="tab-btn" data-tab="logs">Logs</button>
         </div>
 
         <!-- SMTP Settings Tab -->
         <div id="settings" class="tab-content active">
-            <h3>SMTP Settings</h3>
-            <form id="smtp-form">
-                <input type="text" id="smtp-server" placeholder="SMTP Server" required>
-                <input type="number" id="smtp-port" placeholder="SMTP Port" required>
-                <input type="text" id="username" placeholder="Username/Email" required>
-                <input type="password" id="password" placeholder="Password" required>
-                <input type="text" id="sender-name" placeholder="Sender Name">
-                <input type="number" id="delay" placeholder="Delay (seconds)" value="5">
-                <button type="submit" class="primary-btn">Save Settings</button>
-            </form>
+            <div class="section-card">
+                <h3>SMTP Configuration</h3>
+                <form id="smtp-form" class="form-grid">
+                    <input type="text" id="smtp-server" placeholder="SMTP Server" required>
+                    <input type="number" id="smtp-port" placeholder="SMTP Port" required>
+                    <input type="text" id="username" placeholder="Username/Email" required>
+                    <input type="password" id="password" placeholder="Password" required>
+                    <input type="text" id="sender-name" placeholder="Sender Name">
+                    <input type="number" id="delay" placeholder="Delay (seconds)" value="5">
+                    <button type="submit" class="primary-btn">Save Settings</button>
+                </form>
+            </div>
         </div>
 
         <!-- Email List Tab -->
         <div id="emails" class="tab-content">
-            <h3>Email List</h3>
-            <div class="email-input-container">
-                <input type="email" id="new-email" placeholder="Enter email address">
-                <button id="add-email-btn" class="primary-btn">Add Email</button>
+            <div class="section-card">
+                <h3>Email List Management</h3>
+                <div class="email-input-container">
+                    <input type="email" id="new-email" placeholder="Enter email address">
+                    <button id="add-email-btn" class="primary-btn">Add Email</button>
+                </div>
+                <div class="csv-import-container">
+                    <input type="file" id="csv-file" accept=".csv" class="file-input">
+                    <button id="import-csv-btn" class="secondary-btn">Import CSV</button>
+                </div>
+                <textarea id="email-list" placeholder="Email addresses will appear here (one per line)" readonly></textarea>
+                <button id="clear-emails-btn" class="danger-btn">Clear All</button>
             </div>
-            <div class="csv-import-container">
-                <input type="file" id="csv-file" accept=".csv" class="file-input">
-                <button id="import-csv-btn" class="secondary-btn">Import CSV</button>
-            </div>
-            <textarea id="email-list" placeholder="Email addresses will appear here (one per line)" readonly></textarea>
-            <button id="clear-emails-btn" class="danger-btn">Clear All</button>
         </div>
 
         <!-- Template Tab -->
         <div id="template" class="tab-content">
-            <h3>Email Template</h3>
-            <input type="text" id="email-subject" placeholder="Email Subject" class="full-width">
-            <textarea id="email-body" placeholder="Enter your email content here... (HTML or plain text)" class="full-width"></textarea>
-            <div class="form-group">
-                <label for="attachments">Attachments:</label>
-                <input type="file" id="attachments" multiple>
-                <div id="attachment-list" class="attachment-list"></div>
+            <div class="section-card">
+                <h3>Email Template</h3>
+                <input type="text" id="email-subject" placeholder="Email Subject">
+                <textarea id="email-body" placeholder="Enter your email content here... (HTML or plain text)"></textarea>
+                <div class="form-group">
+                    <label for="attachments">Attachments:</label>
+                    <input type="file" id="attachments" multiple>
+                    <div id="attachment-list" class="attachment-list"></div>
+                </div>
+                <button id="send-btn" class="send-btn">Send Emails</button>
             </div>
         </div>
 
-        <!-- Send Button -->
-        <div class="send-container">
-            <button id="send-btn" class="send-btn">Send Emails</button>
-        </div>
-
-        <!-- Logs Section -->
-        <div class="logs-section">
-            <div class="logs-header">
-                <h3>Logs</h3>
-                <span id="log-count">Showing 0 logs</span>
-                <button id="clear-logs-btn" class="danger-btn">Clear Logs</button>
-            </div>
-            <div id="log-entries" class="logs-container">
-                <!-- Logs will be inserted here -->
+        <!-- Logs Tab -->
+        <div id="logs" class="tab-content">
+            <div class="section-card">
+                <div class="logs-header">
+                    <h3>Activity Logs</h3>
+                    <span id="log-count">Showing 0 logs</span>
+                    <button id="clear-logs-btn" class="danger-btn">Clear Logs</button>
+                </div>
+                <div id="log-entries" class="logs-container">
+                    <!-- Logs will be inserted here -->
+                </div>
             </div>
         </div>
     </div>

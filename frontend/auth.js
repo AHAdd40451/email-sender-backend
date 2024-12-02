@@ -1,10 +1,12 @@
-const API_BASE_URL = 'http://localhost:5000';
-// const API_BASE_URL = 'https://email-sender-backend-production.up.railway.app';
+import config from './config.js';
+const { API_BASE_URL } = config;
 
-document.addEventListener('DOMContentLoaded', function() {
-    const loginForm = document.getElementById('loginForm');
-    const registerForm = document.getElementById('registerForm');
-    
+document.addEventListener('DOMContentLoaded', () => {
+    const loginSection = document.getElementById('login-section');
+    const registerSection = document.getElementById('register-section');
+    const showRegisterLink = document.getElementById('show-register');
+    const showLoginLink = document.getElementById('show-login');
+
     // Check if user is already logged in
     const token = localStorage.getItem('token');
     if (token) {
@@ -12,21 +14,26 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    document.getElementById('show-register').addEventListener('click', (e) => {
+    // Toggle between login and register
+    showRegisterLink.addEventListener('click', (e) => {
         e.preventDefault();
-        loginForm.classList.add('hidden');
-        registerForm.classList.remove('hidden');
+        loginSection.classList.remove('active');
+        registerSection.classList.add('active');
     });
 
-    document.getElementById('show-login').addEventListener('click', (e) => {
+    showLoginLink.addEventListener('click', (e) => {
         e.preventDefault();
-        registerForm.classList.add('hidden');
-        loginForm.classList.remove('hidden');
+        registerSection.classList.remove('active');
+        loginSection.classList.add('active');
     });
 
-    document.getElementById('login-btn').addEventListener('click', async () => {
+    // Handle login form submission
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
+
+        console.log('Attempting login with:', { email }); // Debug log
 
         try {
             const response = await fetch(`${API_BASE_URL}/login`, {
@@ -34,12 +41,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password }),
+                credentials: 'include' // Include cookies if needed
             });
 
+            console.log('Login response:', response); // Debug log
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
+            console.log('Login data:', data); // Debug log
             
-            if (response.ok && data.status === 'success') {
+            if (data.status === 'success') {
                 localStorage.setItem('token', data.token);
                 window.location.href = 'popup.html';
             } else {
@@ -47,19 +62,23 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Login error:', error);
-            alert('Login failed: Network or server error');
+            alert('Login failed: ' + error.message);
         }
     });
 
-    document.getElementById('register-btn').addEventListener('click', async () => {
+    // Handle register form submission
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
         const email = document.getElementById('register-email').value;
         const password = document.getElementById('register-password').value;
-        const confirmPassword = document.getElementById('register-confirm-password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
 
         if (password !== confirmPassword) {
             alert('Passwords do not match');
             return;
         }
+
+        console.log('Attempting registration with:', { email }); // Debug log
 
         try {
             const response = await fetch(`${API_BASE_URL}/register`, {
@@ -67,22 +86,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password }),
+                credentials: 'include' // Include cookies if needed
             });
 
-            const data = await response.json();
-            console.log('Registration response:', data);
+            console.log('Register response:', response); // Debug log
 
-            if (response.ok && data.status === 'success') {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Register data:', data); // Debug log
+            
+            if (data.status === 'success') {
                 alert('Registration successful! Please login.');
-                registerForm.classList.add('hidden');
-                loginForm.classList.remove('hidden');
+                registerSection.classList.remove('active');
+                loginSection.classList.add('active');
             } else {
                 alert(data.message || 'Registration failed');
             }
         } catch (error) {
             console.error('Registration error:', error);
-            alert('Registration failed: Network or server error');
+            alert('Registration failed: ' + error.message);
         }
     });
+
+    // Ensure login section is visible by default
+    loginSection.classList.add('active');
+    registerSection.classList.remove('active');
 });

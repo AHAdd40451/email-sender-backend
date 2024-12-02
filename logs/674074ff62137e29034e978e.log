@@ -2,3 +2,7 @@
 {"timestamp": "2024-12-01T23:39:35.329544", "action": "email_sender", "message": "Verifying email domain: gmail.com", "level": "info", "details": null}
 {"timestamp": "2024-12-01T23:39:35.345254", "action": "email_sender", "message": "MX records found for domain gmail.com", "level": "info", "details": null}
 {"timestamp": "2024-12-01T23:39:41.627232", "action": "send_emails", "message": "Email sending completed. Success: 1, Failed: 0", "level": "info", "details": null}
+{"timestamp": "2024-12-02T00:06:40.540587", "action": "send_emails", "message": "Starting email send to 1 recipients", "level": "info", "details": null}
+{"timestamp": "2024-12-02T00:06:40.649239", "action": "email_sender", "message": "Verifying email domain: gmail.com", "level": "info", "details": null}
+{"timestamp": "2024-12-02T00:06:40.664955", "action": "email_sender", "message": "MX records found for domain gmail.com", "level": "info", "details": null}
+{"timestamp": "2024-12-02T00:06:46.619190", "action": "send_emails", "message": "Email sending completed. Success: 1, Failed: 0", "level": "info", "details": null}
