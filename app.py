@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
-from models import User, SmtpSettings, JSONEncoder, EmailList
+from models import User, SmtpSettings, JSONEncoder
 import logging
 import os
 import json
@@ -227,7 +227,7 @@ def send_emails():
         # Initialize email sender with user_id
         email_sender = EmailSender(smtp_settings, user_id)
         
-        # Send emails
+        # Send emails and get result
         result = email_sender.send_bulk_emails(
             email_list=data['emails'],
             subject=data['subject'],
@@ -237,9 +237,10 @@ def send_emails():
 
         # Create a summary message
         summary = f"Sent {result['success_count']} emails successfully, {result['failed_count']} failed"
-
-        save_log(user_id, 'send_emails', f"Email sending completed. Success: {result['success_count']}, Failed: {result['failed_count']}")
         
+        save_log(user_id, 'send_emails', summary)
+        
+        # Return a proper response with all necessary information
         return jsonify({
             'status': 'success',
             'message': summary,
@@ -247,15 +248,16 @@ def send_emails():
                 'successful': result['success_count'],
                 'failed': result['failed_count'],
                 'total': len(data['emails']),
-                'results': result['results']
+                'errors': result.get('errors', [])
             }
-        })
+        }), 200
 
     except Exception as e:
-        save_log(user_id, 'send_emails', f"Error sending emails: {str(e)}", 'error')
+        error_message = str(e)
+        save_log(user_id, 'send_emails', f"Error sending emails: {error_message}", 'error')
         return jsonify({
             'status': 'error',
-            'message': f'Failed to send emails: {str(e)}'
+            'message': f'Failed to send emails: {error_message}'
         }), 500
 
 @app.route('/logs', methods=['GET'])
@@ -339,53 +341,6 @@ def register():
         return jsonify({
             'status': 'error',
             'message': 'An error occurred during registration'
-        }), 500
-
-@app.route('/email-list', methods=['GET'])
-@jwt_required()
-def get_email_list():
-    try:
-        user_id = get_jwt_identity()
-        email_list = EmailList.get_by_user_id(user_id)
-        
-        return jsonify({
-            'status': 'success',
-            'emails': email_list.to_dict()['emails'] if email_list else []
-        })
-
-    except Exception as e:
-        logger.error(f"Error fetching email list: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-@app.route('/email-list', methods=['POST'])
-@jwt_required()
-def save_email_list():
-    try:
-        user_id = get_jwt_identity()
-        data = request.json
-        
-        if not isinstance(data.get('emails'), list):
-            return jsonify({
-                'status': 'error',
-                'message': 'Emails must be provided as a list'
-            }), 400
-
-        email_list = EmailList(user_id=user_id, emails=data['emails'])
-        email_list.save()
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Email list saved successfully'
-        })
-
-    except Exception as e:
-        logger.error(f"Error saving email list: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
         }), 500
 
 # Add error handlers

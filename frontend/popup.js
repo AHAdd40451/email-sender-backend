@@ -1,6 +1,9 @@
 import config from './config.js';
 const { API_BASE_URL } = config;
 
+// Add this at the top of your file with other global variables
+let currentEmailRequest = null;
+
 async function initializeApp() {
     console.log('Initializing app...');
 
@@ -206,7 +209,7 @@ function switchTab(tabId) {
     });
 }
 
-function addEmail() {
+async function addEmail() {
     const emailInput = document.getElementById('new-email');
     const emailList = document.getElementById('email-list');
 
@@ -217,6 +220,10 @@ function addEmail() {
             emails.add(email);
             emailList.value = Array.from(emails).join('\n');
             emailInput.value = '';
+            
+            // Save to both backend and local storage
+            await saveEmailList();
+            await saveEmailTemplate(); // Save any template changes too
         } else {
             console.error('Email already exists in the list');
         }
@@ -288,103 +295,134 @@ async function loadSmtpSettings() {
 }
 
 async function sendEmails() {
+    const sendBtn = document.getElementById('send-btn');
+    const originalBtnText = sendBtn.textContent;
+    
     try {
+        // Prevent multiple sends
+        if (sendBtn.disabled) {
+            return;
+        }
+
         // First check if SMTP settings exist
         const smtpServer = document.getElementById('smtp-server').value;
         if (!smtpServer) {
-            console.error('Please configure SMTP settings first');
+            addLogEntryToUI({
+                level: 'error',
+                message: 'Please configure SMTP settings first',
+                timestamp: new Date().toISOString()
+            });
             switchTab('settings');
             return;
         }
 
+        // Update button to show loading state
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `
+            <span class="spinner"></span>
+            Sending... <button class="cancel-btn">Cancel</button>
+        `;
+
+        // Get email list and validate
         const emailList = document.getElementById('email-list').value
             .split('\n')
             .map(email => email.trim())
             .filter(email => email && isValidEmail(email));
 
         if (emailList.length === 0) {
-            console.error('No valid email addresses provided');
-            return;
+            throw new Error('No valid email addresses provided');
         }
 
+        // Get subject and body
         const subject = document.getElementById('email-subject').value;
-        if (!subject) {
-            console.error('Email subject is required');
-            return;
-        }
-
         const body = document.getElementById('email-body').value;
-        if (!body) {
-            console.error('Email body is required');
-            return;
+
+        if (!subject || !body) {
+            throw new Error('Email subject and body are required');
         }
 
         // Handle attachments
         const attachmentInput = document.getElementById('attachments');
         const attachments = [];
-
-        for (const file of attachmentInput.files) {
-            const reader = new FileReader();
-            const attachment = await new Promise((resolve, reject) => {
-                reader.onload = () => {
-                    resolve({
-                        filename: file.name,
-                        content: reader.result.split(',')[1], // Get base64 content
-                        contentType: file.type
-                    });
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-            attachments.push(attachment);
+        if (attachmentInput && attachmentInput.files.length > 0) {
+            for (const file of attachmentInput.files) {
+                const attachment = await readFileAsBase64(file);
+                attachments.push(attachment);
+            }
         }
 
-        console.info('Starting email send process...');
-        console.info(`Preparing to send to ${emailList.length} recipients...`);
+        // Update button to show loading state
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `
+            <span class="spinner"></span>
+            Sending... <button class="cancel-btn">Cancel</button>
+        `;
 
-        const emailData = {
-            emails: emailList,
-            subject: subject,
-            body: body,
-            attachments: attachments
-        };
+        // Add cancel button functionality
+        const cancelBtn = sendBtn.querySelector('.cancel-btn');
+        if (cancelBtn) {
+            cancelBtn.onclick = (e) => {
+                e.stopPropagation();
+                chrome.runtime.sendMessage({ action: 'cancelSending' });
+            };
+        }
 
-        const response = await fetch(`${API_BASE_URL}/send-emails`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify(emailData)
+        // Send message to background script
+        chrome.runtime.sendMessage({
+            action: 'sendEmails',
+            data: {
+                emails: emailList,
+                subject,
+                body,
+                attachments,
+                token: localStorage.getItem('token')
+            }
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || 'Failed to send emails');
-        }
-
-        // Show success message
-        console.info(data.message);
-
-        // Show detailed results if available
-        if (data.details) {
-            if (data.details.successful > 0) {
-                console.info(`Successfully sent: ${data.details.successful}`);
+        // Listen for status updates
+        chrome.runtime.onMessage.addListener(function(message) {
+            if (message.action === 'statusUpdate') {
+                updateUIStatus(message.status);
             }
-            if (data.details.failed > 0) {
-                console.error(`Failed to send: ${data.details.failed}`);
-            }
-            // Show individual errors if any
-            if (data.details.errors && data.details.errors.length > 0) {
-                data.details.errors.forEach(error => {
-                    console.error(error);
-                });
-            }
-        }
+        });
 
     } catch (error) {
-        console.error('Error sending emails:', error);
+        console.error('Error preparing email send:', error);
+        addLogEntryToUI({
+            level: 'error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+}
+
+// Add this function to update UI based on status
+function updateUIStatus(status) {
+    const sendBtn = document.getElementById('send-btn');
+    
+    if (status.isLoading) {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `
+            <span class="spinner"></span>
+            ${status.progress || 'Sending...'} <button class="cancel-btn">Cancel</button>
+        `;
+    } else {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send Emails';
+        
+        if (status.error) {
+            addLogEntryToUI({
+                level: 'error',
+                message: status.error,
+                timestamp: new Date().toISOString()
+            });
+        } else if (status.progress) {
+            addLogEntryToUI({
+                level: 'success',
+                message: status.progress,
+                timestamp: new Date().toISOString()
+            });
+        }
     }
 }
 
@@ -503,6 +541,7 @@ async function clearLogs() {
 
 async function loadEmailList() {
     try {
+        // Try loading from backend first
         const response = await fetch(`${API_BASE_URL}/email-list`, {
             method: 'GET',
             headers: {
@@ -520,8 +559,21 @@ async function loadEmailList() {
             const emailList = document.getElementById('email-list');
             emailList.value = data.emails.join('\n');
         }
+
+        // Also load from local storage as backup
+        const local = await chrome.storage.local.get(['emailList']);
+        if (local.emailList && (!data.emails || data.emails.length === 0)) {
+            const emailList = document.getElementById('email-list');
+            emailList.value = local.emailList.join('\n');
+        }
     } catch (error) {
         console.error('Error loading email list:', error);
+        // Fallback to local storage
+        const local = await chrome.storage.local.get(['emailList']);
+        if (local.emailList) {
+            const emailList = document.getElementById('email-list');
+            emailList.value = local.emailList.join('\n');
+        }
     }
 }
 
@@ -530,6 +582,7 @@ async function saveEmailList() {
         const emailListText = document.getElementById('email-list').value;
         const emails = emailListText.split('\n').filter(email => email.trim());
 
+        // Save to backend
         const response = await fetch(`${API_BASE_URL}/email-list`, {
             method: 'POST',
             headers: {
@@ -545,14 +598,17 @@ async function saveEmailList() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // Also save to local storage as backup
-        await chrome.storage.local.set({ emailList: emails });
+        // Save to local storage
+        await chrome.storage.local.set({ 
+            emailList: emails,
+            lastUpdated: new Date().toISOString()
+        });
     } catch (error) {
         console.error('Error saving email list:', error);
     }
 }
 
-// Function to save template
+// Modified saveEmailTemplate function
 async function saveEmailTemplate() {
     try {
         const subject = document.getElementById('email-subject').value;
@@ -577,11 +633,31 @@ async function saveEmailTemplate() {
             attachments.push(attachment);
         }
 
+        // Save to backend
+        const response = await fetch(`${API_BASE_URL}/email-template`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                subject,
+                body,
+                attachments
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Save to local storage
         await chrome.storage.local.set({
             emailTemplate: {
-                subject: subject,
-                body: body,
-                attachments: attachments
+                subject,
+                body,
+                attachments,
+                lastUpdated: new Date().toISOString()
             }
         });
     } catch (error) {
@@ -617,10 +693,7 @@ async function handleCsvImport(file) {
             let duplicateCount = 0;
 
             for (let line of lines) {
-                // Split by comma and take only the first column
-                const columns = line.split(',');
-                const email = columns[0]?.trim(); // Get first column and trim whitespace
-
+                const email = line.trim();
                 if (email && isValidEmail(email)) {
                     if (!currentEmails.has(email)) {
                         currentEmails.add(email);
