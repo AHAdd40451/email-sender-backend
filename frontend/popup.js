@@ -134,7 +134,57 @@ function setupEventListeners() {
     // Auto-save email list
     const emailList = document.getElementById('email-list');
     if (emailList) {
-        emailList.addEventListener('input', debounce(saveEmailList, 1000));
+        // Remove readonly attribute
+        emailList.removeAttribute('readonly');
+        
+        // Add input event listener with debounce
+        emailList.addEventListener('input', debounce(async (e) => {
+            // Split by both newlines and commas, then clean and validate
+            const emails = e.target.value
+                .split(/[\n,]/) // Split by newline or comma
+                .map(email => email.trim())
+                .filter(email => email && isValidEmail(email));
+            
+            // Update textarea with cleaned emails (one per line)
+            e.target.value = emails.join('\n');
+            
+            // Save the updated list
+            await saveEmailList();
+        }, 1000));
+
+        // Add paste event handler for better paste handling
+        emailList.addEventListener('paste', async (e) => {
+            e.preventDefault();
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            
+            // Split by both newlines and commas, then clean and validate
+            const emails = pastedText
+                .split(/[\n,]/)
+                .map(email => email.trim())
+                .filter(email => email && isValidEmail(email));
+            
+            // Get existing emails
+            const existingEmails = emailList.value
+                .split('\n')
+                .map(email => email.trim())
+                .filter(email => email);
+            
+            // Combine existing and new emails, remove duplicates
+            const allEmails = [...new Set([...existingEmails, ...emails])];
+            
+            // Update textarea
+            emailList.value = allEmails.join('\n');
+            
+            // Save the updated list
+            await saveEmailList();
+            
+            // Show success message
+            addLogEntryToUI({
+                level: 'success',
+                message: `Pasted ${emails.length} emails (${allEmails.length - existingEmails.length} new)`,
+                timestamp: new Date().toISOString()
+            });
+        });
     }
 
     // CSV Import
@@ -690,9 +740,11 @@ async function handleCsvImport(file) {
 
         reader.onload = async (event) => {
             const csvContent = event.target.result;
-            const lines = csvContent.split(/\r\n|\n/);
             const emailList = document.getElementById('email-list');
             const currentEmails = new Set(emailList.value.split('\n').filter(e => e.trim()));
+            
+            // Split by both newlines and commas
+            const lines = csvContent.split(/[\n,]/);
             let importCount = 0;
             let invalidCount = 0;
             let duplicateCount = 0;
@@ -716,15 +768,12 @@ async function handleCsvImport(file) {
             // Save the updated email list
             await saveEmailList();
 
-            // Show import results
-            console.info(`CSV Import Results:`);
-            console.info(`- ${importCount} emails imported successfully`);
-            if (duplicateCount > 0) {
-                console.info(`- ${duplicateCount} duplicate emails skipped`);
-            }
-            if (invalidCount > 0) {
-                console.error(`- ${invalidCount} invalid emails skipped`);
-            }
+            // Show import results in UI using log entries
+            addLogEntryToUI({
+                level: 'success',
+                message: `CSV Import Results: ${importCount} emails imported successfully${duplicateCount ? `, ${duplicateCount} duplicates skipped` : ''}${invalidCount ? `, ${invalidCount} invalid emails skipped` : ''}`,
+                timestamp: new Date().toISOString()
+            });
         };
 
         reader.onerror = () => {
@@ -734,6 +783,11 @@ async function handleCsvImport(file) {
         reader.readAsText(file);
     } catch (error) {
         console.error('Error importing CSV:', error);
+        addLogEntryToUI({
+            level: 'error',
+            message: `CSV Import Error: ${error.message}`,
+            timestamp: new Date().toISOString()
+        });
     }
 }
 
