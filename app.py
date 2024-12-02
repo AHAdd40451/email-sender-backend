@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
-from models import User, SmtpSettings, JSONEncoder
+from models import User, SmtpSettings, JSONEncoder, EmailList, EmailTemplate
 import logging
 import os
 import json
@@ -341,6 +341,104 @@ def register():
         return jsonify({
             'status': 'error',
             'message': 'An error occurred during registration'
+        }), 500
+
+@app.route('/email-list', methods=['GET'])
+@jwt_required()
+def get_email_list():
+    try:
+        user_id = get_jwt_identity()
+        email_list = EmailList.get_by_user_id(user_id)
+        
+        return jsonify({
+            'status': 'success',
+            'emails': email_list.emails if email_list else []
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching email list: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/email-list', methods=['POST'])
+@jwt_required()
+def save_email_list():
+    try:
+        user_id = get_jwt_identity()
+        data = request.json
+        
+        if not data or 'emails' not in data:
+            return jsonify({
+                'status': 'error',
+                'message': 'No emails provided'
+            }), 400
+
+        email_list = EmailList(user_id=user_id, emails=data['emails'])
+        email_list.save()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Email list saved successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error saving email list: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/email-template', methods=['GET'])
+@jwt_required()
+def get_email_template():
+    try:
+        user_id = get_jwt_identity()
+        template = EmailTemplate.get_by_user_id(user_id)
+        
+        return jsonify({
+            'status': 'success',
+            'template': template[0] if template else None
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching email template: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/email-template', methods=['POST'])
+@jwt_required()
+def save_email_template():
+    try:
+        user_id = get_jwt_identity()
+        data = request.json
+        
+        if not data or 'subject' not in data or 'body' not in data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Subject and body are required'
+            }), 400
+
+        template = EmailTemplate.create(
+            user_id=user_id,
+            name='default',  # Using default as the template name
+            subject=data['subject'],
+            body=data['body']
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Email template saved successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error saving email template: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
         }), 500
 
 # Add error handlers

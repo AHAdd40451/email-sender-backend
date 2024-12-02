@@ -708,7 +708,7 @@ async function handleCsvImport(file) {
 
             emailList.value = Array.from(currentEmails).join('\n');
 
-            // Save the updated email list
+            // Save the updated email list to both backend and local storage
             await saveEmailList();
 
             // Show import results
