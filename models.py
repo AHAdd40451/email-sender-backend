@@ -238,56 +238,54 @@ class EmailTemplate:
     collection = db['email_templates']
 
     def __init__(self, user_id, name, subject, body):
-        self.user_id = user_id
+        self.user_id = ObjectId(user_id) if isinstance(user_id, str) else user_id
         self.name = name
         self.subject = subject
-        self.body = body
+        self.body = str(body) if body is not None else ''
 
     @classmethod
     def create(cls, user_id, name, subject, body):
-        template_data = {
-            'user_id': user_id,
-            'name': name,
-            'subject': subject,
-            'body': body,
-            'created_at': datetime.utcnow()
-        }
-        cls.collection.insert_one(template_data)
-        return cls(user_id=user_id, name=name, subject=subject, body=body)
+        user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
+        
+        # First, check if template exists
+        existing = cls.collection.find_one({'user_id': user_id_obj, 'name': name})
+        
+        if existing:
+            # Update existing template
+            cls.collection.update_one(
+                {'user_id': user_id_obj, 'name': name},
+                {
+                    '$set': {
+                        'subject': subject,
+                        'body': str(body) if body is not None else '',
+                        'updated_at': datetime.utcnow()
+                    }
+                }
+            )
+        else:
+            # Create new template
+            template_data = {
+                'user_id': user_id_obj,
+                'name': name,
+                'subject': subject,
+                'body': str(body) if body is not None else '',
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow()
+            }
+            cls.collection.insert_one(template_data)
+
+        return cls(user_id=user_id_obj, name=name, subject=subject, body=body)
 
     @classmethod
     def get_by_user_id(cls, user_id):
-        return list(cls.collection.find({'user_id': user_id}, {'_id': 0}))
-
-    @classmethod
-    def get_by_id(cls, template_id, user_id):
-        template = cls.collection.find_one({
-            '_id': ObjectId(template_id),
-            'user_id': user_id
-        })
-        if template:
-            return cls(
-                user_id=template['user_id'],
-                name=template['name'],
-                subject=template['subject'],
-                body=template['body']
-            )
-        return None
-
-    def save(self):
-        template_data = {
-            'user_id': self.user_id,
-            'name': self.name,
-            'subject': self.subject,
-            'body': self.body,
-            'updated_at': datetime.utcnow()
-        }
-        self.collection.update_one(
-            {'user_id': self.user_id, 'name': self.name},
-            {'$set': template_data},
-            upsert=True
-        )
-        return self
+        user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
+        templates = list(cls.collection.find({'user_id': user_id_obj}))
+        return [cls(
+            user_id=template['user_id'],
+            name=template.get('name', 'default'),
+            subject=template['subject'],
+            body=template['body']
+        ) for template in templates]
 
     def to_dict(self):
         return {

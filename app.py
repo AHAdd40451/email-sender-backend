@@ -395,11 +395,14 @@ def save_email_list():
 def get_email_template():
     try:
         user_id = get_jwt_identity()
-        template = EmailTemplate.get_by_user_id(user_id)
+        templates = EmailTemplate.get_by_user_id(user_id)
+        
+        # Convert template objects to dictionaries
+        template_dicts = [template.to_dict() for template in templates] if templates else []
         
         return jsonify({
             'status': 'success',
-            'template': template[0] if template else None
+            'template': template_dicts[0] if template_dicts else None
         })
 
     except Exception as e:

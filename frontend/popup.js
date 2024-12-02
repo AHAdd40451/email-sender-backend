@@ -20,6 +20,7 @@ async function initializeApp() {
         await loadSmtpSettings();
         await loadLogs();
         await loadEmailList();
+        await loadEmailTemplate();
 
         console.log('App initialized successfully');
     } catch (error) {
@@ -668,27 +669,7 @@ async function saveEmailTemplate() {
     try {
         const subject = document.getElementById('email-subject').value;
         const body = document.getElementById('email-body').value;
-        const attachmentInput = document.getElementById('attachments');
-        const attachments = [];
 
-        for (const file of attachmentInput.files) {
-            const reader = new FileReader();
-            const attachment = await new Promise((resolve, reject) => {
-                reader.onload = () => {
-                    resolve({
-                        filename: file.name,
-                        content: reader.result.split(',')[1],
-                        contentType: file.type,
-                        size: file.size
-                    });
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-            attachments.push(attachment);
-        }
-
-        // Save to backend
         const response = await fetch(`${API_BASE_URL}/email-template`, {
             method: 'POST',
             headers: {
@@ -697,8 +678,7 @@ async function saveEmailTemplate() {
             },
             body: JSON.stringify({
                 subject,
-                body,
-                attachments
+                body
             })
         });
 
@@ -706,17 +686,25 @@ async function saveEmailTemplate() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // Save to local storage
-        await chrome.storage.local.set({
-            emailTemplate: {
-                subject,
-                body,
-                attachments,
-                lastUpdated: new Date().toISOString()
-            }
+        const data = await response.json();
+        
+        // Show success message
+        addLogEntryToUI({
+            level: 'success',
+            message: 'Email template saved successfully',
+            timestamp: new Date().toISOString()
         });
+
+        // Reload the template to ensure UI is in sync
+        await loadEmailTemplate();
+
     } catch (error) {
         console.error('Error saving template:', error);
+        addLogEntryToUI({
+            level: 'error',
+            message: `Failed to save template: ${error.message}`,
+            timestamp: new Date().toISOString()
+        });
     }
 }
 
@@ -797,4 +785,41 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Add this function to load email template
+async function loadEmailTemplate() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/email-template`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.status === 'success' && data.template) {
+            document.getElementById('email-subject').value = data.template.subject || '';
+            document.getElementById('email-body').value = data.template.body || '';
+            
+            // Show success message
+            addLogEntryToUI({
+                level: 'success',
+                message: 'Email template loaded successfully',
+                timestamp: new Date().toISOString()
+            });
+        }
+    } catch (error) {
+        console.error('Error loading email template:', error);
+        addLogEntryToUI({
+            level: 'error',
+            message: `Failed to load template: ${error.message}`,
+            timestamp: new Date().toISOString()
+        });
+    }
 }
