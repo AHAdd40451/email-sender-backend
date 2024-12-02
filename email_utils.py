@@ -105,16 +105,36 @@ class EmailSender:
         success_count = 0
         failed_count = 0
         errors = []
-        email_statuses = []  # Track status of each email
+        email_statuses = []
+
+        # Log start of bulk email operation
+        self.log_message(
+            f"Starting bulk email operation for {len(email_list)} recipients",
+            'info',
+            details={
+                'total_emails': len(email_list),
+                'subject': subject,
+                'has_attachments': bool(attachments),
+                'attachment_count': len(attachments) if attachments else 0
+            }
+        )
 
         try:
             with smtplib.SMTP(self.settings.smtp_server, self.settings.smtp_port) as server:
                 server.starttls()
                 server.login(self.settings.username, self.settings.password)
+                self.log_message("SMTP connection established successfully", 'info')
 
                 total_emails = len(email_list)
                 for index, email in enumerate(email_list, 1):
+                    start_time = time.time()
                     try:
+                        # Log attempt to send email
+                        self.log_message(
+                            f"Attempting to send email to {email} ({index}/{total_emails})",
+                            'info'
+                        )
+
                         msg = MIMEMultipart()
                         msg['From'] = f"{self.settings.sender_name} <{self.settings.username}>"
                         msg['To'] = email
@@ -123,75 +143,127 @@ class EmailSender:
                         # Add HTML body
                         msg.attach(MIMEText(body_text, 'html'))
 
-                        # Add attachments if present
+                        # Log attachment processing
                         if attachments:
+                            self.log_message(
+                                f"Processing {len(attachments)} attachments for {email}",
+                                'info'
+                            )
                             for attachment in attachments:
-                                part = MIMEBase('application', 'octet-stream')
-                                part.set_payload(attachment['content'])
-                                encoders.encode_base64(part)
-                                part.add_header(
-                                    'Content-Disposition',
-                                    f'attachment; filename="{attachment["filename"]}"'
-                                )
-                                msg.attach(part)
+                                try:
+                                    part = MIMEBase('application', 'octet-stream')
+                                    part.set_payload(attachment['content'])
+                                    encoders.encode_base64(part)
+                                    part.add_header(
+                                        'Content-Disposition',
+                                        f'attachment; filename="{attachment["filename"]}"'
+                                    )
+                                    msg.attach(part)
+                                    self.log_message(
+                                        f"Successfully attached {attachment['filename']}",
+                                        'info'
+                                    )
+                                except Exception as attach_err:
+                                    self.log_message(
+                                        f"Failed to attach {attachment['filename']}: {str(attach_err)}",
+                                        'error'
+                                    )
 
+                        # Send the email
                         server.send_message(msg)
                         success_count += 1
                         status = 'success'
                         error_msg = None
 
+                        # Log successful send
+                        self.log_message(
+                            f"Successfully sent email to {email}",
+                            'info',
+                            details={
+                                'email': email,
+                                'time_taken': f"{time.time() - start_time:.2f}s"
+                            }
+                        )
+
                     except Exception as e:
                         failed_count += 1
                         status = 'failed'
                         error_msg = str(e)
+                        
+                        # Log failed send
+                        self.log_message(
+                            f"Failed to send email to {email}",
+                            'error',
+                            details={
+                                'error': str(e),
+                                'email': email,
+                                'time_taken': f"{time.time() - start_time:.2f}s"
+                            }
+                        )
                         errors.append(f"Failed to send to {email}: {str(e)}")
-                        logger.error(f"Error sending to {email}: {e}")
 
-                    # Log individual email status
                     email_statuses.append({
                         'email': email,
                         'status': status,
                         'error': error_msg,
-                        'timestamp': datetime.utcnow().isoformat()
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'time_taken': f"{time.time() - start_time:.2f}s"
                     })
 
-                    # Log progress every 10 emails or at specific percentages
+                    # Progress logging
                     if index % 10 == 0 or index in [1, total_emails] or (index / total_emails) in [0.25, 0.5, 0.75]:
                         progress_msg = (
                             f"Progress: {index}/{total_emails} emails processed. "
                             f"Success: {success_count}, Failed: {failed_count}"
                         )
-                        self.log_message(progress_msg, 'info')
+                        self.log_message(
+                            progress_msg,
+                            'info',
+                            details={
+                                'progress_percentage': f"{(index/total_emails)*100:.1f}%",
+                                'success_rate': f"{(success_count/index)*100:.1f}%",
+                                'current_success_count': success_count,
+                                'current_failed_count': failed_count
+                            }
+                        )
 
+                    # Apply sending delay
                     time.sleep(self.settings.delay)
 
-            # Generate final summary
-            summary = {
-                'total_sent': total_emails,
-                'success_count': success_count,
-                'failed_count': failed_count,
-                'success_rate': f"{(success_count/total_emails)*100:.1f}%",
-                'failed_emails': [status['email'] for status in email_statuses if status['status'] == 'failed'],
-                'successful_emails': [status['email'] for status in email_statuses if status['status'] == 'success']
-            }
-
-            # Log final summary
-            self.log_message(
-                f"Email sending completed. Success: {success_count}, Failed: {failed_count}",
-                'info',
-                details={
-                    'summary': summary,
-                    'failed_details': [
-                        {'email': status['email'], 'error': status['error']}
-                        for status in email_statuses
-                        if status['status'] == 'failed'
-                    ]
+                # Generate final summary
+                summary = {
+                    'total_sent': total_emails,
+                    'success_count': success_count,
+                    'failed_count': failed_count,
+                    'success_rate': f"{(success_count/total_emails)*100:.1f}%",
+                    'failed_emails': [status['email'] for status in email_statuses if status['status'] == 'failed'],
+                    'successful_emails': [status['email'] for status in email_statuses if status['status'] == 'success']
                 }
-            )
+
+                # Log final summary
+                self.log_message(
+                    "Bulk email operation completed",
+                    'info',
+                    details={
+                        'summary': summary,
+                        'failed_details': [
+                            {'email': status['email'], 'error': status['error']}
+                            for status in email_statuses
+                            if status['status'] == 'failed'
+                        ]
+                    }
+                )
 
         except Exception as e:
-            logger.error(f"SMTP connection error: {e}")
-            self.log_message(f"SMTP connection error: {e}", 'error')
+            self.log_message(
+                "SMTP connection error",
+                'error',
+                details={
+                    'error': str(e),
+                    'smtp_server': self.settings.smtp_server,
+                    'smtp_port': self.settings.smtp_port
+                }
+            )
             raise
 
         return {
