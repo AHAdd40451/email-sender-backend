@@ -237,44 +237,28 @@ class JSONEncoder(json.JSONEncoder):
 class EmailTemplate:
     collection = db['email_templates']
 
-    def __init__(self, user_id, name, subject, body):
+    def __init__(self, user_id, name, subject, body, attachments=None):
         self.user_id = ObjectId(user_id) if isinstance(user_id, str) else user_id
         self.name = name
         self.subject = subject
         self.body = str(body) if body is not None else ''
+        self.attachments = attachments or []
 
     @classmethod
-    def create(cls, user_id, name, subject, body):
+    def create(cls, user_id, name, subject, body, attachments=None):
         user_id_obj = ObjectId(user_id) if isinstance(user_id, str) else user_id
-        
-        # First, check if template exists
-        existing = cls.collection.find_one({'user_id': user_id_obj, 'name': name})
-        
-        if existing:
-            # Update existing template
-            cls.collection.update_one(
-                {'user_id': user_id_obj, 'name': name},
-                {
-                    '$set': {
-                        'subject': subject,
-                        'body': str(body) if body is not None else '',
-                        'updated_at': datetime.utcnow()
-                    }
-                }
-            )
-        else:
-            # Create new template
-            template_data = {
-                'user_id': user_id_obj,
-                'name': name,
-                'subject': subject,
-                'body': str(body) if body is not None else '',
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow()
-            }
-            cls.collection.insert_one(template_data)
+        template_data = {
+            'user_id': user_id_obj,
+            'name': name,
+            'subject': subject,
+            'body': str(body) if body is not None else '',
+            'attachments': attachments or [],
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
+        cls.collection.insert_one(template_data)
 
-        return cls(user_id=user_id_obj, name=name, subject=subject, body=body)
+        return cls(user_id=user_id_obj, name=name, subject=subject, body=body, attachments=attachments)
 
     @classmethod
     def get_by_user_id(cls, user_id):
@@ -284,14 +268,16 @@ class EmailTemplate:
             user_id=template['user_id'],
             name=template.get('name', 'default'),
             subject=template['subject'],
-            body=template['body']
+            body=template['body'],
+            attachments=template.get('attachments', [])
         ) for template in templates]
 
     def to_dict(self):
         return {
             'name': self.name,
             'subject': self.subject,
-            'body': self.body
+            'body': self.body,
+            'attachments': self.attachments
         }
 
 class EmailList:

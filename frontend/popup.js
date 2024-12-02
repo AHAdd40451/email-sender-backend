@@ -400,39 +400,47 @@ async function sendEmails() {
         // Handle attachments
         const attachmentInput = document.getElementById('attachments');
         const attachments = [];
+        
         if (attachmentInput && attachmentInput.files.length > 0) {
+            // Show loading state for attachments
+            addLogEntryToUI({
+                level: 'info',
+                message: 'Processing attachments...',
+                timestamp: new Date().toISOString()
+            });
+
             for (const file of attachmentInput.files) {
-                const attachment = await readFileAsBase64(file);
-                attachments.push(attachment);
+                try {
+                    const attachment = await readFileAsBase64(file);
+                    attachments.push(attachment);
+                    
+                    addLogEntryToUI({
+                        level: 'info',
+                        message: `Processed attachment: ${file.name}`,
+                        timestamp: new Date().toISOString()
+                    });
+                } catch (error) {
+                    throw new Error(`Failed to process attachment ${file.name}: ${error.message}`);
+                }
             }
         }
 
-        // Update button to show loading state
-        sendBtn.disabled = true;
-        sendBtn.innerHTML = `
-            <span class="spinner"></span>
-            Sending... <button class="cancel-btn">Cancel</button>
-        `;
-
-        // Add cancel button functionality
-        const cancelBtn = sendBtn.querySelector('.cancel-btn');
-        if (cancelBtn) {
-            cancelBtn.onclick = (e) => {
-                e.stopPropagation();
-                chrome.runtime.sendMessage({ action: 'cancelSending' });
-            };
-        }
-
-        // Send message to background script
+        // Send message to background script with attachments
         chrome.runtime.sendMessage({
             action: 'sendEmails',
             data: {
                 emails: emailList,
                 subject,
                 body,
-                attachments,
+                attachments, // Now properly processed
                 token: localStorage.getItem('token')
             }
+        }, response => {
+            if (chrome.runtime.lastError) {
+                console.error('Runtime error:', chrome.runtime.lastError);
+                throw new Error(chrome.runtime.lastError.message);
+            }
+            console.log('Send email response:', response);
         });
 
         // Listen for status updates
@@ -449,6 +457,10 @@ async function sendEmails() {
             message: error.message,
             timestamp: new Date().toISOString()
         });
+        
+        // Reset button state
+        sendBtn.disabled = false;
+        sendBtn.textContent = originalBtnText;
     }
 }
 
@@ -822,4 +834,21 @@ async function loadEmailTemplate() {
             timestamp: new Date().toISOString()
         });
     }
+}
+
+// Add this function to handle file reading
+async function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            resolve({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                content: reader.result  // This will be the base64 string
+            });
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(file);  // This will read the file as base64
+    });
 }

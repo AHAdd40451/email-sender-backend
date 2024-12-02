@@ -10,6 +10,8 @@ from dns import resolver
 import logging
 from datetime import datetime
 import smtplib
+from email.mime.base import MIMEBase
+from email import encoders
 
 logger = logging.getLogger(__name__)
 
@@ -100,42 +102,55 @@ class EmailSender:
         save_log(self.user_id, 'email_sender', message, level, details)
 
     def send_bulk_emails(self, email_list, subject, body_text, attachments=None):
-        """Send bulk emails with improved handling for concurrent users"""
-        batch_size = 50
-        max_retries = 3
-        total_emails = len(email_list)
-        results = {
-            'success_count': 0,
-            'failed_count': 0,
-            'results': [],
-            'batches': []
+        success_count = 0
+        failed_count = 0
+        errors = []
+
+        try:
+            with smtplib.SMTP(self.settings.smtp_server, self.settings.smtp_port) as server:
+                server.starttls()
+                server.login(self.settings.username, self.settings.password)
+
+                for email in email_list:
+                    try:
+                        msg = MIMEMultipart()
+                        msg['From'] = f"{self.settings.sender_name} <{self.settings.username}>"
+                        msg['To'] = email
+                        msg['Subject'] = subject
+
+                        # Add HTML body
+                        msg.attach(MIMEText(body_text, 'html'))
+
+                        # Add attachments if present
+                        if attachments:
+                            for attachment in attachments:
+                                part = MIMEBase('application', 'octet-stream')
+                                part.set_payload(attachment['content'])
+                                encoders.encode_base64(part)
+                                part.add_header(
+                                    'Content-Disposition',
+                                    f'attachment; filename="{attachment["filename"]}"'
+                                )
+                                msg.attach(part)
+
+                        server.send_message(msg)
+                        success_count += 1
+                        time.sleep(self.settings.delay)
+
+                    except Exception as e:
+                        failed_count += 1
+                        errors.append(f"Failed to send to {email}: {str(e)}")
+                        logger.error(f"Error sending to {email}: {e}")
+
+        except Exception as e:
+            logger.error(f"SMTP connection error: {e}")
+            raise
+
+        return {
+            'success_count': success_count,
+            'failed_count': failed_count,
+            'errors': errors
         }
-        
-        # Split into batches
-        batches = [email_list[i:i + batch_size] for i in range(0, total_emails, batch_size)]
-        
-        for batch_num, batch in enumerate(batches, 1):
-            batch_result = self._process_batch(
-                batch=batch,
-                batch_num=batch_num,
-                total_batches=len(batches),
-                subject=subject,
-                body_text=body_text,
-                attachments=attachments,
-                max_retries=max_retries
-            )
-            
-            # Update results
-            results['success_count'] += batch_result['success_count']
-            results['failed_count'] += batch_result['failed_count']
-            results['results'].extend(batch_result['results'])
-            results['batches'].append(batch_result['batch_summary'])
-            
-            # Add delay between batches
-            if batch_num < len(batches):
-                self._smart_delay(batch_result['success_count'])
-        
-        return results
 
     def _process_batch(self, batch, batch_num, total_batches, subject, body_text, attachments, max_retries):
         """Process a single batch of emails"""

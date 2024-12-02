@@ -11,6 +11,7 @@ from email.mime.multipart import MIMEMultipart
 from bson import ObjectId
 from email_utils import EmailSender
 from datetime import datetime
+import base64
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -216,6 +217,25 @@ def send_emails():
                 'message': 'Emails, subject, and body are required'
             }), 400
 
+        # Process attachments if present
+        attachments = []
+        if data.get('attachments'):
+            for attachment in data['attachments']:
+                try:
+                    # Decode base64 content
+                    file_content = base64.b64decode(attachment['content'].split(',')[1])
+                    attachments.append({
+                        'filename': attachment['name'],
+                        'content': file_content,
+                        'content_type': attachment['type']
+                    })
+                except Exception as e:
+                    logger.error(f"Error processing attachment {attachment.get('name')}: {e}")
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Error processing attachment {attachment.get("name")}'
+                    }), 400
+
         # Get SMTP settings
         smtp_settings = SmtpSettings.get_by_user_id(user_id)
         if not smtp_settings:
@@ -227,20 +247,17 @@ def send_emails():
         # Initialize email sender with user_id
         email_sender = EmailSender(smtp_settings, user_id)
         
-        # Send emails and get result
+        # Send emails with attachments
         result = email_sender.send_bulk_emails(
             email_list=data['emails'],
             subject=data['subject'],
             body_text=data['body'],
-            attachments=data.get('attachments')
+            attachments=attachments
         )
 
-        # Create a summary message
         summary = f"Sent {result['success_count']} emails successfully, {result['failed_count']} failed"
-        
         save_log(user_id, 'send_emails', summary)
         
-        # Return a proper response with all necessary information
         return jsonify({
             'status': 'success',
             'message': summary,
