@@ -10,7 +10,6 @@ from dns import resolver
 import logging
 from datetime import datetime
 import smtplib
-from logger_utils import save_log
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +96,7 @@ class EmailSender:
 
     def log_message(self, message, level='info', details=None):
         """Log message to file"""
+        from app import save_log  # Import here to avoid circular imports
         save_log(self.user_id, 'email_sender', message, level, details)
 
     def send_bulk_emails(self, email_list, subject, body_text, attachments=None):
@@ -211,16 +211,3 @@ class EmailSender:
                         'attempts': attempt + 1
                     }
                 time.sleep(2 ** attempt)  # Exponential backoff
-
-    def verify_domain(self, domain):
-        save_log(self.user_id, 'verify_domain', f"Verifying email domain: {domain}")
-        try:
-            mx_records = dns.resolver.resolve(domain, 'MX')
-            if mx_records:
-                save_log(self.user_id, 'verify_domain', f"MX records found for domain {domain}")
-                return True
-            save_log(self.user_id, 'verify_domain', f"No MX records found for domain {domain}", level='warning')
-            return False
-        except Exception as e:
-            save_log(self.user_id, 'verify_domain', f"Error verifying domain {domain}: {str(e)}", level='error')
-            return False
